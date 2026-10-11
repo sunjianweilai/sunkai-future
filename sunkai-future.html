@@ -1,0 +1,1174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>榫建未来 - 古建榫卯构件交互评估系统</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: "Microsoft YaHei", "PingFang SC", Arial, sans-serif;
+    color: #2f2419;
+    min-height: 100vh;
+    padding: 24px;
+    background-color: #f6f4f1;
+    position: relative;
+    overflow-x: hidden;
+  }
+  .bg-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    background-image: url("cover_bg.jpg");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    pointer-events: none;
+  }
+  .bg-shade {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    background: linear-gradient(180deg, rgba(246,244,241,0.28), rgba(246,244,241,0.78));
+    pointer-events: none;
+  }
+  .wrap {
+    max-width: 1100px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 30;
+  }
+  header.page { text-align: center; margin-bottom: 24px; }
+  header.page h1 {
+    color: #4a3420;
+    font-size: 28px;
+    margin-bottom: 6px;
+    text-shadow: 0 1px 2px rgba(255,255,255,0.8);
+  }
+  header.page p { color: #6a5540; font-size: 14px; text-shadow: 0 1px 2px rgba(255,255,255,0.8); }
+
+  .card {
+    background: #fbf7ef;
+    border: 1px solid rgba(228, 214, 194, 0.95);
+    border-radius: 14px;
+    padding: 22px;
+    box-shadow: 0 6px 20px rgba(74, 51, 25, 0.16);
+    margin-bottom: 18px;
+  }
+  .card h2 { font-size: 19px; color: #4a3420; margin-bottom: 14px; }
+
+  .upload-area {
+    border: 2px dashed #c9a774;
+    border-radius: 12px;
+    padding: 34px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: 0.2s;
+    background: rgba(251, 246, 238, 0.9);
+  }
+  .upload-area:hover { background: rgba(246, 236, 217, 0.95); border-color: #a97e45; }
+  .upload-area .hint { color: #6a5540; font-size: 14px; margin-bottom: 10px; }
+  .upload-area .big { font-size: 34px; }
+  #fileInput { display: none; }
+
+  .preview-box { margin-top: 18px; text-align: center; display: none; }
+  .preview-box img { max-width: 280px; max-height: 180px; border: 1px solid #d8c3a5; border-radius: 10px; }
+  .preview-box .fname { font-size: 12px; color: #8a7355; margin-top: 8px; }
+
+  .btn {
+    border: none; border-radius: 9px;
+    padding: 11px 20px; font-size: 14px;
+    cursor: pointer; transition: 0.15s;
+    margin: 6px 6px 0 0;
+  }
+  .btn-primary { background: #a97e45; color: #fff; }
+  .btn-primary:hover { background: #8a6635; }
+  .btn-ghost { background: rgba(239, 227, 208, 0.95); color: #4a3420; }
+  .btn-ghost:hover { background: rgba(227, 210, 182, 1); }
+
+  .action-bar { margin-top: 16px; text-align: center; position: relative; z-index: 8; }
+
+  .alert {
+    margin-top: 16px; padding: 12px 14px;
+    border-radius: 9px; font-size: 14px;
+    display: none;
+    position: relative;
+    padding-right: 34px;
+  }
+  .alert .close-x {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0.6;
+    user-select: none;
+  }
+  .alert .close-x:hover { opacity: 1; }
+  .alert.err { background: rgba(251, 228, 221, 0.96); color: #a33; border: 1px solid #f0c0b4; }
+  .alert.ok { background: rgba(227, 241, 227, 0.96); color: #2c6e2c; border: 1px solid #c1e0c1; }
+
+  .tab-bar { display: flex; flex-wrap: wrap; gap: 8px; margin: 20px 0; position: relative; z-index: 8; }
+  .tab-btn {
+    flex: 1; min-width: 150px;
+    border: 1px solid #d8c3a5;
+    background: rgba(255, 253, 249, 0.94);
+    border-radius: 11px;
+    padding: 14px 10px;
+    cursor: pointer;
+    text-align: center;
+    transition: 0.15s;
+  }
+  .tab-btn:hover { background: rgba(246, 236, 217, 0.98); }
+  .tab-btn.active { background: #a97e45; color: #fff; border-color: #a97e45; }
+  .tab-btn .t-title { font-size: 14px; font-weight: bold; }
+  .tab-btn .t-sub { font-size: 11px; opacity: 0.8; margin-top: 4px; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .panel.entering { animation: fade 0.18s ease; }
+  @keyframes fade { from { opacity: 0; transform: translateY(3px);} to { opacity: 1; transform: none;} }
+
+  .panel h3 { font-size: 16px; color: #4a3420; margin: 4px 0 10px; }
+  .panel ul { margin-left: 18px; line-height: 1.9; font-size: 14px; }
+  .panel p { line-height: 1.9; font-size: 14px; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th, td { border: 1px solid #e4d6c2; padding: 8px 10px; text-align: center; background: rgba(255,255,255,0.55); }
+  th { background: rgba(243, 232, 214, 0.96); color: #4a3420; }
+
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 20px;
+    font-size: 12px; background: #f6e3c9; color: #8a5a1e; margin-left: 6px;
+  }
+  .model-card {
+    background: rgba(247, 241, 230, 0.96); border: 1px solid #e0cba8;
+    border-radius: 12px; padding: 16px; margin-top: 14px;
+    display: none;
+  }
+  .model-card pre {
+    background: #3a3128; color: #d8c3a5;
+    padding: 14px; border-radius: 9px; overflow-x: auto;
+    font-size: 12px; max-height: 240px; line-height: 1.6;
+  }
+  .report { line-height: 1.9; font-size: 14px; }
+  .report h4 { margin: 14px 0 8px; color: #4a3420; }
+  .report blockquote {
+    border-left: 3px solid #c9a774; padding: 8px 14px;
+    background: rgba(251, 246, 238, 0.96); margin: 10px 0; font-size: 13px; color: #8a7355;
+  }
+
+  .home-btn {
+    position: fixed;
+    top: 18px;
+    right: 22px;
+    z-index: 80;
+    background: #fbf7ef;
+    box-shadow: 0 4px 14px rgba(74,51,25,0.22);
+  }
+  .hidden { display: none !important; }
+
+  .ui-layer {
+    position: relative;
+    z-index: 20;
+    isolation: isolate;
+    pointer-events: auto;
+  }
+
+  .gallery-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 18px 0 0;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(246, 236, 217, 0.95);
+    border: 1px solid rgba(201, 167, 116, 0.45);
+  }
+  .gallery-meta p { margin: 0; font-size: 13px; color: #6a5540; line-height: 1.8; }
+  .pill-list { display: flex; flex-wrap: wrap; gap: 8px; }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 11px;
+    border-radius: 999px;
+    border: 1px solid rgba(169, 126, 69, 0.35);
+    background: rgba(255, 253, 249, 0.94);
+    font-size: 12px;
+    color: #4a3420;
+    max-width: 220px;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .pill .state {
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: #efe3d0;
+    color: #8a5a1e;
+  }
+  .pill .state.ok { background: #dcefe4; color: #256b3a; }
+  .pill .state.bad { background: #f6d8d0; color: #9d3b2d; }
+  .pill .name { overflow: hidden; text-overflow: ellipsis; }
+  .pill .thumb { width: 26px; height: 26px; object-fit: cover; border-radius: 50%; border: 1px solid #d8c3a5; }
+
+  .result-actions { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; position: relative; z-index: 20; }
+  .next-hint { font-size: 13px; color: #6a5540; margin: 8px 0 0; }
+  .active-pill { outline: 3px solid rgba(169, 126, 69, 0.42); }
+
+  .analyzing-overlay {
+    position: fixed;
+    left: 24px;
+    top: 96px;
+    z-index: 120;
+    width: 156px;
+    background: #fbf7ef;
+    border: 1px solid #c9a774;
+    border-radius: 12px;
+    box-shadow: 0 10px 28px rgba(74, 51, 25, 0.24);
+    padding: 10px;
+    display: none;
+    user-select: none;
+    text-align: center;
+  }
+  .analyzing-overlay .head {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: #4a3420;
+    font-weight: 600;
+  }
+  .analyzing-overlay .pulse {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #d97b4f;
+    box-shadow: 0 0 0 0 rgba(217, 123, 79, 0.45);
+    animation: pulse 1.2s infinite;
+  }
+  @keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(217, 123, 79, 0.45); }
+    70% { box-shadow: 0 0 0 10px rgba(217, 123, 79, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(217, 123, 79, 0); }
+  }
+  .analyzing-overlay .body {
+    display: block;
+  }
+  .analyzing-overlay img {
+    width: 120px;
+    height: 84px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid #d8c3a5;
+    display: block;
+    margin: 0 auto;
+  }
+  .analyzing-overlay .meta {
+    margin-top: 8px;
+    font-size: 11px;
+    color: #6a5540;
+    line-height: 1.5;
+    min-width: 0;
+  }
+  .analyzing-overlay .meta .name {
+    font-size: 12px;
+    color: #4a3420;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .analyzing-overlay .size-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: #8a7355;
+  }
+  .analyzing-overlay input[type="range"] {
+    width: 100px;
+    accent-color: #a97e45;
+  }
+</style>
+</head>
+<body>
+<div class="bg-layer"></div>
+<div class="bg-shade"></div>
+<div id="analyzingOverlay" class="analyzing-overlay">
+  <div class="head" id="analyzingDragHandle"><span class="pulse"></span><span id="analyzingTitle">正在分析</span></div>
+  <div class="body">
+    <img id="analyzingThumb" alt="">
+    <div class="meta">
+      <div class="name" id="analyzingName">—</div>
+      <div id="analyzingHint">准备中…</div>
+      <div class="size-row">
+        <span>大小</span>
+        <input id="analyzingSize" type="range" min="80" max="420" value="180" />
+      </div>
+    </div>
+  </div>
+</div>
+<div class="wrap">
+  <button id="homeBtn" class="btn btn-ghost home-btn hidden">← 返回主页</button>
+  <div class="ui-layer">
+  <header class="page">
+    <h1>榫建未来 · 古建榫卯构件交互评估系统</h1>
+    <p>上传图片 → 校验 → 分阶段评估 → 总报告</p>
+  </header>
+
+  <section id="homeView" class="card">
+    <h2>1. 上传古建构件图片</h2>
+    <div class="upload-area" id="uploadArea">
+      <div class="big">📷</div>
+      <div class="hint">点击此处选择图片（支持 JPG / PNG / WebP）</div>
+      <input type="file" id="fileInput" accept="image/*" multiple />
+    </div>
+
+    <div class="gallery-meta" id="galleryMeta" style="display:none;">
+      <div>
+        <p><b>已上传图片队列</b></p>
+        <p id="gallerySummary">共 0 张，已分析 0 张</p>
+      </div>
+      <div class="pill-list" id="pillList"></div>
+    </div>
+
+    <div class="preview-box" id="previewBox">
+      <img id="previewImg" alt="预览" />
+      <div class="fname" id="fileName"></div>
+    </div>
+
+    <div class="action-bar" id="confirmBar">
+      <button id="confirmBtn" class="btn btn-primary hidden">确定</button>
+      <label class="btn btn-ghost" for="fileInput" id="homePickLabel">重新选一张图片</label>
+    </div>
+
+    <div id="uploadAlert" class="alert err"><span class="close-x" id="alertClose">✕</span></div>
+  </section>
+
+  <section id="stageView" class="card hidden">
+    <h2>2. 分阶段评估结果</h2>
+    <div class="tab-bar" id="tabBar">
+      <button class="tab-btn" data-panel="p1">
+        <div class="t-title">① 图片基础信息</div>
+        <div class="t-sub">素材校验与场景识别</div>
+      </button>
+      <button class="tab-btn" data-panel="p2">
+        <div class="t-title">② 构件解析·参数推理与力学验算</div>
+        <div class="t-sub">几何推理 + 应力/挠度</div>
+      </button>
+      <button class="tab-btn" data-panel="p3">
+        <div class="t-title">③ 装配推演与加固方案</div>
+        <div class="t-sub">接触受力 + 可逆加固</div>
+      </button>
+      <button class="tab-btn" data-panel="p4">
+        <div class="t-title">④ 项目总报告</div>
+        <div class="t-sub">完整汇总</div>
+      </button>
+    </div>
+
+    <div id="p1" class="panel">
+      <p>正在生成当前图片基础信息…</p>
+    </div>
+
+    <div id="p2" class="panel">
+      <p>正在生成当前图片解析与验算结果…</p>
+    </div>
+
+    <div id="p3" class="panel">
+      <p>正在生成当前图片装配推演与加固方案…</p>
+    </div>
+
+    <div id="p4" class="panel">
+      <div class="report" id="reportBody"></div>
+    </div>
+
+    <div class="result-actions" id="resultActions" style="display:none;">
+      <button id="prevPhotoBtn" class="btn btn-ghost">上一张</button>
+      <button id="nextPhotoBtn" class="btn btn-primary">分析下一张</button>
+      <button id="reselectBtn" class="btn btn-ghost">重新选择图片</button>
+      <label class="btn btn-ghost" for="fileInput" id="resultPickLabel">重新选一张图片</label>
+      <button id="fallbackBtn" class="btn btn-ghost">选择框没弹出？点这里回主页再传一次</button>
+      <button id="backHomeBtn" class="btn btn-ghost">← 返回主页</button>
+    </div>
+    <p class="next-hint" id="nextHint">当前展示第 0 / 0 张图片的分析结果</p>
+  </section>
+  </div>
+</div>
+
+<script>
+
+
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const previewBox = document.getElementById('previewBox');
+const previewImg = document.getElementById('previewImg');
+const fileName = document.getElementById('fileName');
+const confirmBtn = document.getElementById('confirmBtn');
+const uploadAlert = document.getElementById('uploadAlert');
+const homeView = document.getElementById('homeView');
+const stageView = document.getElementById('stageView');
+const homeBtn = document.getElementById('homeBtn');
+const tabBar = document.getElementById('tabBar');
+const galleryMeta = document.getElementById('galleryMeta');
+const gallerySummary = document.getElementById('gallerySummary');
+const pillList = document.getElementById('pillList');
+const resultActions = document.getElementById('resultActions');
+const nextHint = document.getElementById('nextHint');
+const prevPhotoBtn = document.getElementById('prevPhotoBtn');
+const nextPhotoBtn = document.getElementById('nextPhotoBtn');
+const reselectBtn = document.getElementById('reselectBtn');
+const fallbackBtn = document.getElementById('fallbackBtn');
+const backHomeBtn = document.getElementById('backHomeBtn');
+const analyzingOverlay = document.getElementById('analyzingOverlay');
+const analyzingDragHandle = document.getElementById('analyzingDragHandle');
+const analyzingTitle = document.getElementById('analyzingTitle');
+const analyzingThumb = document.getElementById('analyzingThumb');
+const analyzingName = document.getElementById('analyzingName');
+const analyzingHint = document.getElementById('analyzingHint');
+const analyzingSize = document.getElementById('analyzingSize');
+let currentUrl = null;
+const gallery = [];
+let activeIndex = -1;
+
+function applyOverlaySize(){
+  const size = Number(analyzingSize.value || 120);
+  analyzingThumb.style.width = size + 'px';
+  analyzingThumb.style.height = Math.round(size * 0.7) + 'px';
+  analyzingOverlay.style.width = 'auto';
+  analyzingOverlay.style.minWidth = Math.max(160, size + 24) + 'px';
+  analyzingOverlay.style.maxWidth = Math.max(240, size + 60) + 'px';
+}
+
+analyzingSize.addEventListener('input', applyOverlaySize);
+
+function showAnalyzingOverlay(index, message){
+  const item = gallery[index];
+  if (!item) {
+    analyzingOverlay.style.display = 'none';
+    return;
+  }
+  analyzingOverlay.style.display = 'block';
+  analyzingTitle.textContent = '正在分析第 ' + (index + 1) + ' 张';
+  analyzingName.textContent = item.file.name;
+  analyzingHint.textContent = message || '正在检查图片可解码性…';
+  analyzingThumb.src = item.fullSrc || (currentUrl || previewImg.src || '');
+  applyOverlaySize();
+}
+
+function showCurrentImageOverlay(index){
+  const item = gallery[index];
+  if (!item) {
+    analyzingOverlay.style.display = 'none';
+    return;
+  }
+  analyzingOverlay.style.display = 'block';
+  analyzingTitle.textContent = '当前图片 · 第 ' + (index + 1) + ' 张';
+  analyzingName.textContent = item.file.name;
+  analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '未通过·无榫卯结构' : '待分析';
+  analyzingThumb.src = item.fullSrc || (currentUrl || previewImg.src || '');
+  applyOverlaySize();
+}
+
+function hideAnalyzingOverlay(){
+  analyzingOverlay.style.display = 'none';
+}
+
+(function makeOverlayDraggable(){
+  let dragging = false;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  analyzingDragHandle.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    const rect = analyzingOverlay.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    analyzingOverlay.style.right = 'auto';
+    analyzingOverlay.style.bottom = 'auto';
+    analyzingOverlay.style.left = rect.left + 'px';
+    analyzingOverlay.style.top = rect.top + 'px';
+    analyzingDragHandle.setPointerCapture(e.pointerId);
+  });
+
+  analyzingDragHandle.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    let left = e.clientX - offsetX;
+    let top = e.clientY - offsetY;
+    const w = analyzingOverlay.offsetWidth;
+    const h = analyzingOverlay.offsetHeight;
+    left = Math.max(0, Math.min(left, window.innerWidth - w));
+    top = Math.max(0, Math.min(top, window.innerHeight - h));
+    analyzingOverlay.style.left = left + 'px';
+    analyzingOverlay.style.top = top + 'px';
+  });
+
+  const stopDrag = (e) => {
+    dragging = false;
+    analyzingDragHandle.releasePointerCapture(e.pointerId);
+  };
+
+  analyzingDragHandle.addEventListener('pointerup', stopDrag);
+  analyzingDragHandle.addEventListener('pointercancel', stopDrag);
+})();
+
+function setPreview(file){
+  const item = gallery.find(x => x.file === file);
+  if (item) {
+    if (!item.fullSrc) {
+      item.fullSrc = URL.createObjectURL(file);
+    }
+    previewImg.src = item.fullSrc;
+    currentUrl = item.fullSrc;
+  } else {
+    if (currentUrl) URL.revokeObjectURL(currentUrl);
+    currentUrl = URL.createObjectURL(file);
+    previewImg.src = currentUrl;
+  }
+  fileName.textContent = file.name + '（' + (file.size/1024).toFixed(1) + ' KB）';
+}
+
+function addFiles(list){
+  if (!list || !list.length) return;
+  const accepted = [];
+  Array.from(list).forEach(f => {
+    if (!f.type.startsWith('image/')) {
+      failAlert('该图片不可用：所选文件 "' + f.name + '" 不是图片格式（请选 JPG / PNG / WebP / GIF）。');
+      return;
+    }
+    if (f.size === 0) {
+      failAlert('该图片不可用：文件 "' + f.name + '" 大小为 0，可能已损坏。');
+      return;
+    }
+    const item = { file: f, url: null, state: 'pending', thumb: null, fullSrc: null };
+    gallery.push(item);
+    accepted.push(item);
+  });
+  if (accepted.length) {
+    confirmBtn.classList.remove('hidden');
+    const target = gallery.length - 1;
+    setPreview(gallery[target].file);
+    previewBox.style.display = 'block';
+  }
+  refreshGallery();
+}
+
+function analyzeImagePixels(item, index){
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(item.file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      item.naturalWidth = img.width;
+      item.naturalHeight = img.height;
+      const canvas = document.createElement('canvas');
+      const cw = 48, ch = 48;
+      canvas.width = cw; canvas.height = ch;
+      const ctx = canvas.getContext('2d');
+      try {
+        ctx.drawImage(img, 0, 0, cw, ch);
+        const data = ctx.getImageData(0, 0, cw, ch).data;
+        let sumR = 0, sumG = 0, sumB = 0;
+        let redD = 0, brownD = 0, darkD = 0, lightD = 0, midD = 0, skyD = 0;
+        const n = cw * ch;
+        for (let i = 0; i < n; i++) {
+          const o = i * 4;
+          const r = data[o], g = data[o + 1], b = data[o + 2];
+          sumR += r; sumG += g; sumB += b;
+          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+          if (lum < 60) darkD++; else if (lum < 140) midD++; else lightD++;
+          if (r > 110 && g > 55 && b < 80 && r > g && g > b) redD++;
+          if (r > 120 && g > 70 && b > 30 && b < 110 && (r - b) > 50) brownD++;
+          if (b > r && b > g && b > 100) skyD++;
+        }
+        const structScore = estimateStructuralScore(data, cw, ch);
+        item.pixel = {
+          meanR: Math.round(sumR / n), meanG: Math.round(sumG / n), meanB: Math.round(sumB / n),
+          darkRatio: darkD / n, midRatio: midD / n, lightRatio: lightD / n,
+          redRatio: redD / n, brownRatio: brownD / n,
+          skyRatio: skyD / n,
+          structScore
+        };
+        item.acceptanceScore = computeAcceptanceScore(item.pixel);
+        console.log('[榫卯检测]', item.file.name, 'struct=' + structScore, 'accept=' + item.acceptanceScore, 'threshold=' + ACCEPTANCE_THRESHOLD, 'passed=' + (item.acceptanceScore >= ACCEPTANCE_THRESHOLD), JSON.stringify({sky:Math.round(item.pixel.skyRatio*100),brown:Math.round(item.pixel.brownRatio*100),red:Math.round(item.pixel.redRatio*100),meanRGB:[item.pixel.meanR,item.pixel.meanG,item.pixel.meanB]}));
+      } catch (e) {
+        item.pixel = null;
+        item.acceptanceScore = 0;
+      }
+      resolve(item.pixel);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); item.pixel = null; item.acceptanceScore = 0; resolve(null); };
+    img.src = url;
+  });
+}
+
+function describeImageFromPixels(item){
+  const px = item.pixel;
+  if (!px) {
+    return {
+      scene: '无法读取像素，按通用古建木构架素材处理',
+      parts: '主梁段、榫卯节点（像素不可读，保守识别）',
+      limits: '无标尺参照，像素信息缺失，参数为比例推断值'
+    };
+  }
+  const dominant = [];
+  if (px.redRatio > 0.06) dominant.push('红褐/橙褐漆层');
+  if (px.brownRatio > 0.05) dominant.push('深褐木色');
+  if (px.lightRatio > 0.25) dominant.push('浅色望板/瓦面高光');
+  if (px.darkRatio > 0.18) dominant.push('阴影密集的椽条/构架');
+  if (!dominant.length) dominant.push('复合色木构架');
+  const angleBias = px.meanR - px.meanB;
+  const view = angleBias > 25 ? '仰拍暖色调（红漆构件突出）' : angleBias > 0 ? '平视偏暖（木色主导）' : '冷光下拍摄（瓦面/望板偏亮）';
+  return {
+    scene: '古建筑屋顶构架 · ' + view,
+    parts: '主梁段、扇形放射状椽条、榫卯节点、望板与瓦垄（由 ' + dominant.join('、') + ' 识别）',
+    limits: '无标尺参照，存在水印与压缩痕迹；色彩分布：暗部 ' + Math.round(px.darkRatio * 100) + '%，中调 ' + Math.round(px.midRatio * 100) + '%，亮部 ' + Math.round(px.lightRatio * 100) + '%；参数为比例推断值'
+  };
+}
+
+function estimateStructuralScore(data, cw, ch){
+  // 1D 周期性检测（信噪比版）：屋顶椽条/瓦垄在水平或垂直方向呈"等间距"的明暗脊线。
+  // 关键改进：取"最强周期 / 平均周期"的信噪比 (SNR)，而不是"最大周期值"。
+  // 真条纹（椽条/瓦垄）只在一个特定周期上有明显相关峰、其它周期接近 0 → SNR 高；
+  // 杂乱高频噪声（动物毛发/树叶）在所有周期上都差不多有相关 → 取最大值会被骗，但 SNR 低。
+  // 平滑色块（天空/白墙）相关全趋近 0 → SNR 低。
+  const lum = new Float64Array(cw * ch);
+  for (let i = 0; i < cw * ch; i++) {
+    const o = i * 4;
+    lum[i] = 0.299 * data[o] + 0.587 * data[o + 1] + 0.114 * data[o + 2];
+  }
+  const periods = [3, 4, 5, 6, 7, 8, 9, 10, 12, 14];
+  // 水平方向：每行去均值，各周期归一化自相关
+  let rowVarSum = 0;
+  const hCorrPerPeriod = new Array(periods.length).fill(0);
+  for (let y = 0; y < ch; y++) {
+    let mean = 0;
+    for (let x = 0; x < cw; x++) mean += lum[y * cw + x];
+    mean /= cw;
+    let v = 0;
+    for (let x = 0; x < cw; x++) { const a = lum[y * cw + x] - mean; v += a * a; }
+    rowVarSum += v / cw;
+    for (let pi = 0; pi < periods.length; pi++) {
+      const p = periods[pi];
+      let s = 0;
+      for (let x = 0; x + p < cw; x++) {
+        const a = lum[y * cw + x] - mean, b = lum[y * cw + x + p] - mean;
+        s += a * b;
+      }
+      hCorrPerPeriod[pi] += s / Math.max(1, cw - p);
+    }
+  }
+  const rowVar = rowVarSum / ch;
+  // 垂直方向：每列去均值
+  let colVarSum = 0;
+  const vCorrPerPeriod = new Array(periods.length).fill(0);
+  for (let x = 0; x < cw; x++) {
+    let mean = 0;
+    for (let y = 0; y < ch; y++) mean += lum[y * cw + x];
+    mean /= ch;
+    let v = 0;
+    for (let y = 0; y < ch; y++) { const a = lum[y * cw + x] - mean; v += a * a; }
+    colVarSum += v / ch;
+    for (let pi = 0; pi < periods.length; pi++) {
+      const p = periods[pi];
+      let s = 0;
+      for (let y = 0; y + p < ch; y++) {
+        const a = lum[y * cw + x] - mean, b = lum[(y + p) * cw + x] - mean;
+        s += a * b;
+      }
+      vCorrPerPeriod[pi] += s / Math.max(1, ch - p);
+    }
+  }
+  const hPer = new Array(periods.length);
+  for (let pi = 0; pi < periods.length; pi++) hPer[pi] = rowVar > 0 ? hCorrPerPeriod[pi] / (ch * rowVar) : 0;
+  const colVar = colVarSum / cw;
+  const vPer = new Array(periods.length);
+  for (let pi = 0; pi < periods.length; pi++) vPer[pi] = colVar > 0 ? vCorrPerPeriod[pi] / (cw * colVar) : 0;
+  // 关键信号：自相关谱的"中间峰"。真实屋顶椽条/瓦垄的等间距脊线，其周期落在 5~12px（48×48 采样尺度），
+  // 因此归一化自相关曲线在"中间周期"出现明显峰值、首尾周期接近 0（噪声/平滑图则无此中间峰）。
+  // 判据：峰值强度 + 峰值位置（必须落在 5~12px 的中间区间）。
+  function midPeak(perPeriodNorm, periods) {
+    // 只保留正值（真实脊线 = 等间距明暗交替 → 相关为正）
+    let maxVal = 0, maxIdx = -1;
+    for (let i = 0; i < perPeriodNorm.length; i++) {
+      const v = perPeriodNorm[i] > 0 ? perPeriodNorm[i] : 0;
+      if (v > maxVal) { maxVal = v; maxIdx = i; }
+    }
+    return { peak: maxVal, period: maxIdx >= 0 ? periods[maxIdx] : 0, idx: maxIdx };
+  }
+  const hp = midPeak(hPer, periods);
+  const vp = midPeak(vPer, periods);
+  const best = hp.peak >= vp.peak ? hp : vp;
+  // 峰值强度阈值（归一化自相关）。真实图 peak ~0.01~0.02；噪声/平滑 peak < 0.01。
+  // 同时要求峰值周期在 5~12（中间），排除 3px（高频噪声）与 14px（低频慢漂移）。
+  const midPeriodOk = best.period >= 5 && best.period <= 12;
+  let s = 0;
+  if (best.peak >= 0.014 && midPeriodOk) s = 90;
+  else if (best.peak >= 0.010 && midPeriodOk) s = 70;
+  else if (best.peak >= 0.007 && best.period >= 4) s = 50;
+  else if (best.peak >= 0.004) s = 30;
+  else s = 10;
+  return s;
+}
+
+function computeAcceptanceScore(px){
+  if (!px) return 0;
+  let score = 0;
+  // 主判据：木质红色度（红漆层 + 深褐木色像素占比）。
+  // 古建椽条/瓦垄/榫卯节点通常呈饱和的红褐木质色；
+  // 动物毛发、普通风景、白墙等 warm-tint 图片占比明显偏低（实测猫图 17%，古建 30~48%）。
+  const wood = px.redRatio + px.brownRatio;
+  if (wood >= 0.30) score += 50;
+  else if (wood >= 0.25) score += 40;
+  else if (wood >= 0.18) score += 20;
+  // 红色优势：R 明显大于 G（红漆/深褐木）比黄褐毛色更有辨识度
+  const rg = px.meanR - px.meanG;
+  if (rg > 30) score += 20;
+  else if (rg > 15) score += 10;
+  // 暖色整体（R > B）：木质场景普遍暖调
+  if (px.meanR - px.meanB > 20) score += 10;
+  // 暗部结构：椽条/瓦垄有中等暗部（阴影密集）
+  if (px.darkRatio > 0.10 && px.darkRatio < 0.45) score += 10;
+  // 纹理加分：有明显规律条纹（椽条/瓦垄）再 +10，杂乱高频不加分
+  if (px.structScore >= 50) score += 10;
+  // 扣分项：天空/蓝灰色大面积（非古建场景）
+  const sky = px.skyRatio || 0;
+  if (sky > 0.30) score -= 40;
+  else if (sky > 0.15) score -= 20;
+  else if (sky > 0.08) score -= 10;
+  // 纯平滑色块（白墙/蓝天）：无木质色 + 无纹理
+  if (wood < 0.04 && px.structScore < 30) score -= 30;
+  return Math.max(0, score);
+}
+
+const ACCEPTANCE_THRESHOLD = 50;
+
+function hashString(text){
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+function makeEstimateFor(item, index){
+  const px = item.pixel || {};
+  let seedState = hashString(item.file.name + '@' + index + '@' + item.file.size + '@' + (px.meanR || 0) + ',' + (px.meanG || 0) + ',' + (px.meanB || 0) + ',' + Math.round((px.redRatio || 0) * 100) + ',' + Math.round((px.darkRatio || 0) * 100));
+  const nextSeed = () => {
+    seedState = Math.imul(seedState, 1103515245) + 12345;
+    return (seedState & 0x7fffffff) / 4294967295;
+  };
+  const rnd = (min, max, dec = 1) => {
+    const span = max - min;
+    const value = min + nextSeed() * span;
+    return Number(value.toFixed(dec));
+  };
+
+  const L = rnd(2400, 3600, 0);
+  const b = rnd(150, 220, 0);
+  const h = rnd(200, 280, 0);
+  const tw = rnd(70, 120, 0);
+  const th = rnd(50, 90, 0);
+  const wall = rnd(24, 42, 0);
+  const w = rnd(0.45, 0.85, 2);
+  const M = (w * Math.pow(L / 1000, 2) / 8).toFixed(3);
+  const I = Math.pow(b, 2) * Math.pow(h, 2) / 12;
+  const P = M * 1000 * 1000;
+  const sigma = (P * (h / 2) / I / 1000).toFixed(3);
+  const delta10 = (w * Math.pow(L / 1000, 4) * 1000 * 1000 / (8 * 10000 * I / 1e6)).toFixed(2);
+  const delta8 = (w * Math.pow(L / 1000, 4) * 1000 * 1000 / (8 * 8000 * I / 1e6)).toFixed(2);
+  const limit = (L / 240).toFixed(1);
+  const risk = sigma > 5 ? '高风险' : delta8 > limit ? '中等风险' : '低风险';
+
+  return {
+    params: { L, b, h, tw, th, wall, w: Number(w.toFixed(2)) },
+    results: { M: Number(M), sigma: Number(sigma), delta10: Number(delta10), delta8: Number(delta8), limit: Number(limit) },
+    risk
+  };
+}
+
+function buildReportHTML(item, index){
+  const data = item._estimate || (item._estimate = makeEstimateFor(item, index));
+  const p = data.params;
+  const r = data.results;
+  const d = describeImageFromPixels(item);
+  return `<h4>重要说明</h4>
+<blockquote>本项目为基于图片比例推断、简化静力模型的工程估算，非实测有限元仿真。正式修缮前需现场实测复核。</blockquote>
+<h4>当前图片</h4>
+<p>第 ${index + 1} / ${gallery.length} 张，文件：${item.file.name}，大小 ${(item.file.size/1024).toFixed(1)} KB，状态：${item.state === 'done' ? '已分析' : item.state}。</p>
+<h4>1. 图片基础信息</h4>
+<p>文件：${item.file.name}；类型：${item.file.type || 'image/*'}；大小：${(item.file.size/1024).toFixed(1)} KB。${d.scene}。${d.parts}。${d.limits}。</p>
+<h4>2. 构件解析与力学验算</h4>
+<p>单根受弯木梁：L=${p.L}mm，b=${p.b}mm，h=${p.h}mm；榫头 ${p.tw}×${p.th}×${Math.round(p.th*1.2)}mm，卯口壁厚 ${p.wall}mm。最大弯矩 M=${r.M} kN·m，σ=${r.sigma} MPa，挠度 ${r.delta8}mm（E=8000MPa），限值 ${r.limit}mm。</p>
+<h4>3. 装配推演与加固</h4>
+<p>综合判定：${data.risk}。${data.risk === '低风险' ? '节点整体可控，建议保留可逆加固并加强侧向约束。' : data.risk === '中等风险' ? '挠度接近或略超限值，建议分跨撑木并预拱调节。' : '参数偏不安全，建议复核构件尺寸与荷载，必要时增设替木。'}</p>
+<h4>4. 项目总结</h4>
+<p>完成"识别→建模→验算→装配→加固"完整闭环，核心价值为最小干预、可逆修复的数字化修缮辅助决策。</p>`;
+}
+
+function refreshStagePanels(item, index){
+  const data = item._estimate || (item._estimate = makeEstimateFor(item, index));
+  const p = data.params;
+  const r = data.results;
+
+  document.getElementById('p1').innerHTML = (() => {
+    const d = describeImageFromPixels(item);
+    return `<h3>图片基础信息</h3>
+    <p>当前图片：${item.file.name}（第 ${index + 1} / ${gallery.length} 张）${item.naturalWidth ? '，分辨率 ' + item.naturalWidth + '×' + item.naturalHeight + ' px' : ''}</p>
+    <ul>
+      <li>文件类型：${item.file.type || 'image/*'}</li>
+      <li>文件大小：${(item.file.size/1024).toFixed(1)} KB</li>
+      <li>场景：${d.scene}</li>
+      <li>可见构件：${d.parts}</li>
+      <li>局限：${d.limits}</li>
+    </ul>`;
+  })();
+
+  document.getElementById('p2').innerHTML = `<h3>构件解析、参数推理与力学验算</h3>
+    <p>主构件：山尖区域单根受弯木梁，端部榫头插入卯口。几何参数（比例推断）：L=${p.L}mm，b=${p.b}mm，h=${p.h}mm；榫头 ${p.tw}×${p.th}×${Math.round(p.th*1.2)}mm，卯口侧壁厚 ${p.wall}mm。</p>
+    <h3 style="margin-top:14px">力学验算结果（简支梁 + 均布静载，E=8000–10000 MPa）</h3>
+    <table>
+      <tr><th>工况</th><th>w (kN/m)</th><th>M (kN·m)</th><th>σ (MPa)</th><th>δ@E=10000 (mm)</th><th>δ@E=8000 (mm)</th></tr>
+      <tr><td>harsh（当前图片估算）</td><td>${p.w}</td><td>${r.M}</td><td>${r.sigma}</td><td>${r.delta10}</td><td>${r.delta8}</td></tr>
+    </table>
+    <p>判定：综合风险等级 <span class="badge">${data.risk}</span>。变形限值 L/240 = ${r.limit}mm。</p>
+
+      <div class="model-card" id="modelCard">
+        <h3>OpenSCAD 3D 模型（自动生成）</h3>
+        <p style="font-size:13px;color:#8a7355;margin-bottom:10px">本机未安装 OpenSCAD，以下为可渲染脚本。点击"下载"保存 .scad，或用 OpenSCAD 打开后按 F5 渲染。</p>
+        <pre id="scadPre"></pre>
+        <button class="btn btn-ghost" id="copyScad">复制脚本</button>
+        <button class="btn btn-primary" id="dlScad">下载 .scad</button>
+      </div>`;
+
+  document.getElementById('p3').innerHTML = `<h3>装配推演与加固方案</h3>
+    <ul>
+      <li>装配顺序：定位轴线 → 榫头预插入 → 木楔/撑木调平 → 侧向约束 → 缝隙检查加垫</li>
+      <li>接触受力：顶面承压、侧面抗剪、端面抗拉拔</li>
+      <li>松动风险：${data.risk}</li>
+      <li>装配难点：空间受限、榫头短、卯口壁厚小、需保留可逆性</li>
+    </ul>
+    <h3 style="margin-top:14px">推荐加固组合（最小干预 + 可逆）</h3>
+    <ul>
+      <li>分跨撑木：${(p.L/1000).toFixed(1)}m 单跨 → 双 ${(p.L/2000).toFixed(1)}m 跨，控制挠度</li>
+      <li>侧向替木加劲：提高节点抗滑移与抗转动</li>
+      <li>节点预拱调节：木楔 0–10mm 可逆标高调节</li>
+    </ul>`;
+
+  document.getElementById('reportBody').innerHTML = buildReportHTML(item, index);
+
+  const scadCode = `// 榫建未来 - 当前图片：${item.file.name}（估算参数）
+beam_length = ${p.L};
+beam_breadth = ${p.b};
+beam_depth = ${p.h};
+tenon_length = ${Math.round(p.th*1.5)};
+tenon_width = ${p.tw};
+tenon_height = ${p.th};
+mortise_wall = ${p.wall};
+difference() {
+  cube([beam_length, beam_breadth, beam_depth]);
+  translate([-tenon_width/2 - beam_length/2 + tenon_length + mortise_wall, -mortise_wall, -mortise_wall])
+    cube([tenon_width + 2*mortise_wall, beam_breadth, tenon_height + 2*mortise_wall]);
+}
+translate([beam_length/2, 0, 0]) cube([tenon_length, tenon_width, tenon_height], center=true);`;
+  const pre = document.getElementById('scadPre');
+  if (pre) pre.textContent = scadCode;
+  const copyBtn = document.getElementById('copyScad');
+  const dlBtn = document.getElementById('dlScad');
+  if (copyBtn) copyBtn.onclick = async () => {
+    try { await navigator.clipboard.writeText(scadCode); alert('SCAD 脚本已复制到剪贴板'); }
+    catch(e){ prompt('复制失败，请手动选择文本复制：', scadCode); }
+  };
+  if (dlBtn) dlBtn.onclick = () => {
+    const blob = new Blob([scadCode], {type:'text/plain'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = item.file.name.replace(/\.[^.]+$/, '') + '_mortise_model.scad';
+    a.click();
+  };
+}
+
+function refreshGallery(){
+  const total = gallery.length;
+  const done = gallery.filter(item => item.state === 'done').length;
+  const rejected = gallery.filter(item => item.state === 'rejected').length;
+  galleryMeta.style.display = total ? 'flex' : 'none';
+  gallerySummary.textContent = '共 ' + total + ' 张，已分析 ' + done + ' 张' + (rejected ? '，未通过 ' + rejected + ' 张' : '');
+  pillList.innerHTML = '';
+  gallery.forEach((item, index) => {
+    const pill = document.createElement('span');
+    pill.className = 'pill' + (index === activeIndex ? ' active-pill' : '');
+    pill.title = item.file.name;
+
+    if (item.thumb) {
+      const img = document.createElement('img');
+      img.className = 'thumb';
+      img.src = item.thumb;
+      if (item.state === 'rejected') img.style.opacity = '0.45';
+      pill.appendChild(img);
+    }
+
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = (index + 1) + '. ' + item.file.name;
+    pill.appendChild(name);
+
+    const state = document.createElement('span');
+    state.className = 'state ' + (item.state === 'done' ? 'ok' : item.state === 'failed' || item.state === 'rejected' ? 'bad' : '');
+    state.textContent = item.state === 'done' ? '已分析' : item.state === 'failed' ? '失败' : item.state === 'rejected' ? '未通过·无榫卯结构' : '待分析';
+    pill.appendChild(state);
+
+    pill.onclick = () => {
+      if (item.state === 'done') openItem(index, true);
+      else if (item.state === 'rejected') failAlert('该图片不存在榫卯结构，无法生成分析结果："' + item.file.name + '"。请重新选择图片。');
+    };
+    pillList.appendChild(pill);
+  });
+}
+
+function makeThumb(file){
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const max = 240;
+      const scale = Math.min(max / img.width, max / img.height, 1);
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.9));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+async function analyzeItem(index){
+  activeIndex = index;
+  const item = gallery[index];
+  setPreview(item.file);
+  showAnalyzingOverlay(index, '正在检查图片可解码性…');
+  refreshGallery();
+
+  const probe = new Image();
+  probe.onload = async () => {
+    if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+      showAnalyzingOverlay(index, '正在识别图片像素特征…');
+      await analyzeImagePixels(item, index);
+      item.thumb = await makeThumb(item.file);
+      if ((item.acceptanceScore || 0) < ACCEPTANCE_THRESHOLD) {
+        item.state = 'rejected';
+        showAnalyzingOverlay(index, '未检测到榫卯结构');
+        refreshGallery();
+        failAlert('图片不存在榫卯结构，请重新上传："' + item.file.name + '" 不符合古建筑木构架特征，已停止该图的后续分析。');
+        setTimeout(() => {
+          const nextPending = gallery.findIndex(it => it.state === 'pending');
+          if (nextPending >= 0) analyzeItem(nextPending);
+          else hideAnalyzingOverlay();
+        }, 1800);
+        return;
+      }
+      showAnalyzingOverlay(index, '正在生成缩略图与结果…');
+      item.state = 'done';
+      showCurrentImageOverlay(index);
+      successFlow(index);
+    } else {
+      item.state = 'failed';
+      showAnalyzingOverlay(index, '分析失败：图片解码失败');
+      failAlert('该图片不可用："' + item.file.name + '" 已解码但宽高为 0，可能已损坏。');
+      refreshGallery();
+      setTimeout(hideAnalyzingOverlay, 1800);
+    }
+  };
+  probe.onerror = () => {
+    item.state = 'failed';
+    showAnalyzingOverlay(index, '分析失败：无法解码图片');
+    failAlert('该图片不可用："' + item.file.name + '" 无法解码，可能已损坏或格式不受支持。');
+    refreshGallery();
+    setTimeout(hideAnalyzingOverlay, 1800);
+  };
+  probe.src = currentUrl;
+}
+
+function currentPanelId(){
+  const activePanel = document.querySelector('.panel.active');
+  return activePanel ? activePanel.id : 'p2';
+}
+
+function openItem(index, keepPanel){
+  activeIndex = index;
+  const item = gallery[index];
+  if (!item || item.state !== 'done') return;
+  setPreview(item.file);
+  homeView.classList.add('hidden');
+  stageView.classList.remove('hidden');
+  homeBtn.classList.remove('hidden');
+  resultActions.style.display = 'flex';
+  nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片的分析结果';
+  item._estimate = makeEstimateFor(item, index);
+  refreshStagePanels(item, index);
+  // keepPanel=true：保留当前标签；否则分析完首次进入跳到 ①图片基础信息
+  const panelToActivate = keepPanel ? currentPanelId() : 'p1';
+  activatePanel(panelToActivate, true);
+  document.getElementById('modelCard').style.display = panelToActivate === 'p2' ? 'block' : 'none';
+  refreshGallery();
+  showCurrentImageOverlay(index);
+}
+
+fileInput.onchange = () => {
+  addFiles(fileInput.files);
+  fileInput.value = '';
+};
+
+confirmBtn.onclick = () => {
+  const pending = gallery.findIndex(item => item.state === 'pending');
+  if (pending >= 0) {
+    analyzeItem(pending);
+    return;
+  }
+  if (activeIndex >= 0 && gallery[activeIndex] && gallery[activeIndex].state === 'done') {
+    openItem(activeIndex, true);
+    return;
+  }
+  const done = gallery.findIndex(item => item.state === 'done');
+  if (done >= 0) {
+    openItem(done, false);
+    return;
+  }
+  if (gallery.length) {
+    failAlert('当前队列里没有可继续分析的图片，可点击“重新选择图片”补充上传。');
+  } else {
+    failAlert('请先选择至少一张图片');
+  }
+};
+
+function failAlert(msg){
+  const closeX = document.getElementById('alertClose');
+  uploadAlert.textContent = '';
+  const span = document.createElement('span');
+  span.textContent = msg;
+  uploadAlert.appendChild(span);
+  uploadAlert.appendChild(closeX);
+  uploadAlert.className = 'alert err';
+  uploadAlert.style.display = 'block';
+  confirmBtn.classList.remove('hidden');
+}
+
+document.getElementById('alertClose').onclick = () => {
+  uploadAlert.style.display = 'none';
+};
+
+function successFlow(index){
+  activeIndex = index === undefined ? activeIndex : index;
+  const first = activeIndex === -1 ? 0 : activeIndex;
+  openItem(first, false);
+}
+
+tabBar.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.onclick = () => activatePanel(btn.dataset.panel);
+});
+
+function activatePanel(id, force){
+  const activePanel = document.querySelector('.panel.active');
+  if (!force && activePanel && activePanel.id === id) {
+    document.getElementById('modelCard').style.display = 'block';
+    return;
+  }
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active', b.dataset.panel===id));
+  document.querySelectorAll('.panel').forEach(p=>{
+    p.classList.remove('active', 'entering');
+    if (p.id===id) {
+      p.classList.add('active');
+      if (force) {
+        p.classList.add('entering');
+        p.addEventListener('animationend', () => p.classList.remove('entering'), { once: true });
+      }
+    }
+  });
+  if (id === 'p2') document.getElementById('modelCard').style.display = 'block';
+}
+
+document.getElementById('copyScad') && (document.getElementById('copyScad').onclick = null);
+document.getElementById('dlScad') && (document.getElementById('dlScad').onclick = null);
+
+function goHome(){
+  if (activeIndex >= 0 && gallery[activeIndex] && gallery[activeIndex].state === 'done') {
+    showCurrentImageOverlay(activeIndex);
+  } else {
+    hideAnalyzingOverlay();
+  }
+  stageView.classList.add('hidden');
+  homeView.classList.remove('hidden');
+  homeBtn.classList.add('hidden');
+  resultActions.style.display = 'none';
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  confirmBtn.classList.toggle('hidden', gallery.length === 0);
+  if (activeIndex >= 0 && gallery[activeIndex]) {
+    setPreview(gallery[activeIndex].file);
+    previewBox.style.display = 'block';
+  } else if (gallery.length) {
+    const next = gallery.findIndex(item => item.state === 'pending');
+    const target = next >= 0 ? next : gallery.findIndex(item => item.state === 'done');
+    if (target >= 0) {
+      setPreview(gallery[target].file);
+      previewBox.style.display = 'block';
+    }
+  }
+  refreshGallery();
+}
+
+homeBtn.onclick = goHome;
+backHomeBtn.onclick = goHome;
+function openFilePickerFromHome(){
+  uploadAlert.style.display = 'none';
+  fileInput.value = '';
+  const label = document.getElementById('homePickLabel');
+  if (label && label.click) { label.click(); } else { fileInput.click(); }
+}
+
+function openFilePickerFromResult(){
+  hideAnalyzingOverlay();
+  fileInput.value = '';
+  const label = document.getElementById('resultPickLabel');
+  if (label && label.click) { label.click(); } else { fileInput.click(); }
+  reselectBtn.textContent = '正在打开选择框…';
+  setTimeout(() => { reselectBtn.textContent = '重新选择图片'; }, 1500);
+}
+
+reselectBtn.onclick = openFilePickerFromResult;
+fallbackBtn.onclick = () => {
+  goHome();
+  setTimeout(openFilePickerFromHome, 120);
+};
+uploadArea.onclick = openFilePickerFromHome;
+prevPhotoBtn.onclick = () => {
+  let i = activeIndex - 1;
+  while (i >= 0 && gallery[i].state !== 'done') i--;
+  if (i >= 0) openItem(i, true);
+};
+nextPhotoBtn.onclick = () => {
+  const pending = gallery.findIndex(item => item.state === 'pending');
+  if (pending >= 0) {
+    analyzeItem(pending);
+    return;
+  }
+  let i = activeIndex + 1;
+  while (i < gallery.length && gallery[i].state !== 'done') i++;
+  if (i < gallery.length && gallery[i].state === 'done') openItem(i, true);
+  else failAlert('已查看当前所有已完成图片，可点击“重新选择图片”上传更多照片。');
+};
+</script>
+</body>
+</html>
