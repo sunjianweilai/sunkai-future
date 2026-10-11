@@ -488,19 +488,32 @@ function showAnalyzingOverlay(index, message){
 function showCurrentImageOverlay(index){
   const item = gallery[index];
   if (!item) {
-    analyzingOverlay.style.display = 'none';
+    // 小窗始终存在：无图时显示"待上传"
+    analyzingOverlay.style.display = 'block';
+    analyzingTitle.textContent = '当前图片';
+    analyzingName.textContent = '（尚未上传图片）';
+    analyzingHint.textContent = '请上传图片开始分析';
     return;
   }
   analyzingOverlay.style.display = 'block';
   analyzingTitle.textContent = '当前图片 · 第 ' + (index + 1) + ' 张';
   analyzingName.textContent = item.file.name;
   analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '图片不存在榫卯结构，请重新上传' : '待分析';
-  analyzingThumb.src = item.fullSrc || (currentUrl || previewImg.src || '');
+  analyzingThumb.src = item.thumb || item.fullSrc || (currentUrl || previewImg.src || '');
   applyOverlaySize();
 }
 
 function hideAnalyzingOverlay(){
-  analyzingOverlay.style.display = 'none';
+  // 小窗不再隐藏：始终显示当前正在分析/展示的图
+  if (activeIndex >= 0 && gallery[activeIndex]) {
+    showCurrentImageOverlay(activeIndex);
+  } else {
+    // 没有任何图时，小窗显示"待选择图片"
+    analyzingOverlay.style.display = 'block';
+    analyzingTitle.textContent = '当前图片';
+    analyzingName.textContent = '（尚未上传图片）';
+    analyzingHint.textContent = '请上传图片开始分析';
+  }
 }
 
 (function makeOverlayDraggable(){
@@ -1030,7 +1043,7 @@ async function analyzeItem(index){
         setTimeout(() => {
           const nextPending = gallery.findIndex(it => it.state === 'pending');
           if (nextPending >= 0) analyzeItem(nextPending);
-          else hideAnalyzingOverlay();
+          else showCurrentImageOverlay(index); // 保留小窗：显示当前被拒图
         }, 1800);
         return;
       }
@@ -1043,7 +1056,7 @@ async function analyzeItem(index){
       showAnalyzingOverlay(index, '分析失败：图片解码失败');
       failAlert('该图片不可用："' + item.file.name + '" 已解码但宽高为 0，可能已损坏。');
       refreshGallery();
-      setTimeout(hideAnalyzingOverlay, 1800);
+      setTimeout(() => showCurrentImageOverlay(index), 1800);
     }
   };
   probe.onerror = () => {
@@ -1051,7 +1064,7 @@ async function analyzeItem(index){
     showAnalyzingOverlay(index, '分析失败：无法解码图片');
     failAlert('该图片不可用："' + item.file.name + '" 无法解码，可能已损坏或格式不受支持。');
     refreshGallery();
-    setTimeout(hideAnalyzingOverlay, 1800);
+    setTimeout(() => showCurrentImageOverlay(index), 1800);
   };
   probe.src = currentUrl;
 }
@@ -1242,4 +1255,4 @@ nextPhotoBtn.onclick = () => {
 </body>
 </html>
 
-<!-- synced 2026-10-11T14:33:36.995Z -->
+<!-- synced 2026-10-11T14:50:00.478Z -->
