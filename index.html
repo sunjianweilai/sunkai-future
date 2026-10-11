@@ -212,6 +212,19 @@
     overflow: hidden;
     white-space: nowrap;
   }
+  .pill-del {
+    flex: none;
+    width: 18px; height: 18px;
+    line-height: 14px; padding: 0;
+    margin-left: 2px;
+    border: 1px solid rgba(163, 51, 51, 0.4);
+    border-radius: 50%;
+    background: rgba(255, 245, 240, 0.9);
+    color: #a33; font-size: 10px; font-weight: 700;
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .pill-del:hover { background: #a33; color: #fff; border-color: #a33; }
   .pill .state {
     font-size: 11px;
     padding: 2px 7px;
@@ -481,7 +494,7 @@ function showCurrentImageOverlay(index){
   analyzingOverlay.style.display = 'block';
   analyzingTitle.textContent = '当前图片 · 第 ' + (index + 1) + ' 张';
   analyzingName.textContent = item.file.name;
-  analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '未通过·无榫卯结构' : '待分析';
+  analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '图片不存在榫卯结构，请重新上传' : '待分析';
   analyzingThumb.src = item.fullSrc || (currentUrl || previewImg.src || '');
   applyOverlaySize();
 }
@@ -941,8 +954,39 @@ function refreshGallery(){
       if (item.state === 'done') openItem(index, true);
       else if (item.state === 'rejected') { openItem(index, true); failAlert('该图片不存在榫卯结构，无法生成分析结果："' + item.file.name + '"。请重新选择图片。'); }
     };
+    // 删除键：从队列中移除这张图
+    const del = document.createElement('button');
+    del.className = 'pill-del';
+    del.title = '删除这张图片';
+    del.textContent = '✕';
+    del.onclick = (e) => { e.stopPropagation(); removeItem(index); };
+    pill.appendChild(del);
     pillList.appendChild(pill);
   });
+}
+
+function removeItem(index){
+  const item = gallery[index];
+  if (!item) return;
+  const isPreview = item.file && item.file.name;
+  if (confirm('确定从队列中删除这张图片吗？\n' + item.file.name)) {
+    if (item.thumb && item.thumb.indexOf('data:') !== 0 && item.thumb.indexOf('blob:') === 0) { /* 缩略图是 dataURL，无需释放 */ }
+    gallery.splice(index, 1);
+    // 调整 activeIndex：删的是当前激活图 → 指向前一张；否则保持序号对应
+    if (activeIndex === index) activeIndex = Math.min(index, Math.max(0, gallery.length - 1));
+    else if (activeIndex > index) activeIndex--;
+    refreshGallery();
+    // 如果删的是当前正在展示的图，且还有可展示的图，切到它；否则回首页
+    if (activeIndex >= 0 && gallery[activeIndex] && gallery[activeIndex].state === 'done') {
+      openItem(activeIndex, true);
+    } else if (gallery.length === 0) {
+      goHome();
+    } else {
+      const target = gallery.findIndex(it => it.state === 'done') >= 0 ? gallery.findIndex(it => it.state === 'done') : 0;
+      if (gallery[target] && gallery[target].state === 'done') openItem(target, true);
+      else goHome();
+    }
+  }
 }
 
 function makeThumb(file){
@@ -1127,6 +1171,9 @@ document.getElementById('dlScad') && (document.getElementById('dlScad').onclick 
 function goHome(){
   if (activeIndex >= 0 && gallery[activeIndex] && gallery[activeIndex].state === 'done') {
     showCurrentImageOverlay(activeIndex);
+  } else if (activeIndex >= 0 && gallery[activeIndex] && gallery[activeIndex].state === 'rejected') {
+    // 被拒图：小窗也保留在旁边，提示"图片不存在榫卯结构，请重新上传"
+    showCurrentImageOverlay(activeIndex);
   } else {
     hideAnalyzingOverlay();
   }
@@ -1195,4 +1242,4 @@ nextPhotoBtn.onclick = () => {
 </body>
 </html>
 
-<!-- synced 2026-10-11T14:01:12.129Z -->
+<!-- synced 2026-10-11T14:33:36.995Z -->
