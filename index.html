@@ -142,6 +142,14 @@
     display: inline-block; padding: 3px 10px; border-radius: 20px;
     font-size: 12px; background: #f6e3c9; color: #8a5a1e; margin-left: 6px;
   }
+  .rejected-notice {
+    background: rgba(255, 245, 240, 0.96); border: 2px solid #e0a89a;
+    border-radius: 12px; padding: 28px 22px; margin-top: 8px;
+  }
+  .rejected-notice h3 {
+    color: #a33; font-size: 18px; letter-spacing: 0.5px;
+  }
+
   .model-card {
     background: rgba(247, 241, 230, 0.96); border: 1px solid #e0cba8;
     border-radius: 12px; padding: 16px; margin-top: 14px;
@@ -816,6 +824,8 @@ function buildReportHTML(item, index){
 }
 
 function refreshStagePanels(item, index){
+  // 被拒图片：四个功能页面全部显示"图片不存在榫卯结构，请重新上传"
+  if (item.state === 'rejected') { showRejectedOnPanels(item); return; }
   const data = item._estimate || (item._estimate = makeEstimateFor(item, index));
   const p = data.params;
   const r = data.results;
@@ -929,7 +939,7 @@ function refreshGallery(){
 
     pill.onclick = () => {
       if (item.state === 'done') openItem(index, true);
-      else if (item.state === 'rejected') failAlert('该图片不存在榫卯结构，无法生成分析结果："' + item.file.name + '"。请重新选择图片。');
+      else if (item.state === 'rejected') { openItem(index, true); failAlert('该图片不存在榫卯结构，无法生成分析结果："' + item.file.name + '"。请重新选择图片。'); }
     };
     pillList.appendChild(pill);
   });
@@ -970,6 +980,7 @@ async function analyzeItem(index){
       if ((item.acceptanceScore || 0) < ACCEPTANCE_THRESHOLD) {
         item.state = 'rejected';
         showAnalyzingOverlay(index, '未检测到榫卯结构');
+        showRejectedOnPanels(item);
         refreshGallery();
         failAlert('图片不存在榫卯结构，请重新上传："' + item.file.name + '" 不符合古建筑木构架特征，已停止该图的后续分析。');
         setTimeout(() => {
@@ -1006,22 +1017,33 @@ function currentPanelId(){
   return activePanel ? activePanel.id : 'p2';
 }
 
+function showRejectedOnPanels(item){
+  const msg = '图片不存在榫卯结构，请重新上传';
+  const block = '<div class="rejected-notice"><h3 style="color:#a33;margin-bottom:10px">' + msg + '</h3>' +
+    '<p style="font-size:14px;color:#6a5a4a;line-height:1.7">"' + (item ? item.file.name : '') + '" 未通过古建筑木构架特征检测，已停止该图的后续分析。请更换为古建椽条/瓦垄/榫卯节点等图片重新上传。</p></div>';
+  ['p1','p2','p3','p4'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = block; });
+  const report = document.getElementById('reportBody'); if (report) report.innerHTML = block;
+  const mc = document.getElementById('modelCard'); if (mc) mc.style.display = 'none';
+}
+
 function openItem(index, keepPanel){
   activeIndex = index;
   const item = gallery[index];
-  if (!item || item.state !== 'done') return;
+  if (!item || (item.state !== 'done' && item.state !== 'rejected')) return;
   setPreview(item.file);
   homeView.classList.add('hidden');
   stageView.classList.remove('hidden');
   homeBtn.classList.remove('hidden');
-  resultActions.style.display = 'flex';
-  nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片的分析结果';
-  item._estimate = makeEstimateFor(item, index);
+  resultActions.style.display = item.state === 'done' ? 'flex' : 'none';
+  nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片' + (item.state === 'rejected' ? '（未通过，无榫卯结构）' : '的分析结果');
+  if (item.state === 'done') {
+    item._estimate = makeEstimateFor(item, index);
+  }
   refreshStagePanels(item, index);
-  // keepPanel=true：保留当前标签；否则分析完首次进入跳到 ①图片基础信息
-  const panelToActivate = keepPanel ? currentPanelId() : 'p1';
+  // keepPanel=true：保留当前标签；否则首次进入（通过图）默认展示 ① 图片基础信息；被拒图固定在 ①
+  const panelToActivate = item.state === 'rejected' ? 'p1' : (keepPanel ? currentPanelId() : 'p1');
   activatePanel(panelToActivate, true);
-  document.getElementById('modelCard').style.display = panelToActivate === 'p2' ? 'block' : 'none';
+  document.getElementById('modelCard').style.display = (item.state === 'done' && panelToActivate === 'p2') ? 'block' : 'none';
   refreshGallery();
   showCurrentImageOverlay(index);
 }
@@ -1173,4 +1195,4 @@ nextPhotoBtn.onclick = () => {
 </body>
 </html>
 
-<!-- synced 2026-10-11T09:40:46.887Z -->
+<!-- synced 2026-10-11T14:01:12.129Z -->
