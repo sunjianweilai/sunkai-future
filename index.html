@@ -501,12 +501,10 @@ function showCurrentImageOverlay(index){
   analyzingTitle.textContent = '当前图片 · 第 ' + (index + 1) + ' 张';
   analyzingName.textContent = item.file.name;
   analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '图片不存在榫卯结构，请重新上传' : '待校验：点【确定】执行检查';
-  // 小窗严格跟随“当前选中这张图”：不管这张图有没有结构，都显示它自己的图，绝不残留上一张的图
-  // 用“当前这张图自己的 fullSrc”作为小窗图源（缺失就现建），被拒/失败/待校验图没有缩略图 thumb，也照样显示其原图 fullSrc
-  // 每次切图都重新指定 src（哪怕值不变），强制浏览器刷新，杜绝“小窗图片不动”的缓存残留
-  if (!item.fullSrc) { item.fullSrc = URL.createObjectURL(item.file); }
-  analyzingThumb.src = item.fullSrc;
-  analyzingThumb.setAttribute('src', item.fullSrc); // 强制重新赋值，确保切到被拒图时小窗立刻换成该图
+  // 小窗严格跟随“当前选中这张图”：不管这张图有没有结构，都显示它自己的原图，绝不残留上一张的图
+  // 被拒/失败/待校验图没有生成过缩略图 thumb，也直接用该图自己的原图 blob（缺失就现建）作为小窗图源
+  if (!item.thumb) { item.thumb = URL.createObjectURL(item.file); }
+  analyzingThumb.src = item.thumb;
   applyOverlaySize();
 }
 
@@ -1101,11 +1099,10 @@ function openItem(index, keepPanel){
   if (item.state === 'done') {
     // 有结果：保留 thumb/pixel/_estimate，切图不重新校验，小窗直接显示该图原图
   } else {
-    // 无结果（rejected/failed/pending）：清空旧校验标记，避免各图串数据
+    // 无结果（rejected/failed/pending）：清空旧校验标记，避免各图串数据；thumb 保留（小窗要显示这张图本身，绝不残留上一张）
     item._estimate = null;
     item.acceptanceScore = null;
     item.pixel = null;
-    item.thumb = null;
   }
   setPreview(item.file);
   homeView.classList.add('hidden');
@@ -1315,11 +1312,11 @@ fallbackBtn.onclick = () => {
 uploadArea.onclick = openFilePickerFromHome;
 prevPhotoBtn.onclick = () => {
   const i = activeIndex - 1;
-  if (i >= 0) { openItem(i, false); showCurrentImageOverlay(i); } // 切图后强制小窗显示当前这张图（含无结构图），小窗不再残留上一张
+  if (i >= 0) openItem(i, false); // 小窗 + 预览 + 四界面始终跟随切到当前这张图（含无结构图），不残留上一张
 };
 nextPhotoBtn.onclick = () => {
   const i = activeIndex + 1;
-  if (i < gallery.length) { openItem(i, false); showCurrentImageOverlay(i); } // 切图后强制小窗显示当前这张图（含无结构图），小窗不再残留上一张
+  if (i < gallery.length) openItem(i, false); // 小窗 + 预览 + 四界面始终跟随切到当前这张图（含无结构图），不残留上一张
   else failAlert('已查看当前所有图片，可点击“重新选择图片”上传更多照片。');
 };
 </script>
@@ -1330,4 +1327,4 @@ nextPhotoBtn.onclick = () => {
 
 <!-- synced 2026-10-12T12:13:30.171Z -->
 
-<!-- synced 2026-10-12T14:29:29.367Z -->
+<!-- synced 2026-10-12T14:40:06.096Z -->
