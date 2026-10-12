@@ -481,7 +481,9 @@ function showAnalyzingOverlay(index, message){
   analyzingTitle.textContent = '正在分析第 ' + (index + 1) + ' 张';
   analyzingName.textContent = item.file.name;
   analyzingHint.textContent = message || '正在检查图片可解码性…';
-  analyzingThumb.src = item.fullSrc || (currentUrl || previewImg.src || '');
+  // 分析中：小窗显示当前正在分析这张图（缺 fullSrc 就现建，绝不残留其它图）
+  if (!item.fullSrc) { item.fullSrc = URL.createObjectURL(item.file); }
+  analyzingThumb.src = item.fullSrc;
   applyOverlaySize();
 }
 
@@ -499,11 +501,11 @@ function showCurrentImageOverlay(index){
   analyzingTitle.textContent = '当前图片 · 第 ' + (index + 1) + ' 张';
   analyzingName.textContent = item.file.name;
   analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '图片不存在榫卯结构，请重新上传' : '待校验：点【确定】执行检查';
-  // 不存在榫卯结构(rejected)时：小窗也必须显示这张被拒图片本身，缩略图缺则用 fullSrc（缺则现建 blob）
-  if (item.state === 'rejected' && !item.thumb && !item.fullSrc) {
-    item.fullSrc = URL.createObjectURL(item.file);
-  }
-  analyzingThumb.src = item.thumb || item.fullSrc || (currentUrl || previewImg.src || '');
+  // 小窗严格跟随“当前选中这张图”：
+  // 存在结构(done) → 显示该图缩略图；不存在结构(rejected) → 也显示该被拒图本身（绝不残留上一张）
+  // 统一用“当前这张图自己的 fullSrc”作为小窗图源，缺失就现建，杜绝跟错图
+  if (!item.fullSrc) { item.fullSrc = URL.createObjectURL(item.file); }
+  analyzingThumb.src = (item.state === 'done' && item.thumb) ? item.thumb : item.fullSrc;
   applyOverlaySize();
 }
 
@@ -1336,4 +1338,4 @@ nextPhotoBtn.onclick = () => {
 
 <!-- synced 2026-10-12T12:13:30.171Z -->
 
-<!-- synced 2026-10-12T13:47:20.997Z -->
+<!-- synced 2026-10-12T13:56:18.433Z -->
