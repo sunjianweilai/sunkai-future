@@ -1142,15 +1142,18 @@ fileInput.onchange = () => {
   fileInput.value = '';
 };
 
-confirmBtn.onclick = () => {
-  // 优先校验当前小窗正在展示的这张（若它是待校验），否则找队列第一个 pending
-  if (activeIndex >= 0 && gallery[activeIndex] && gallery[activeIndex].state === 'pending') {
-    analyzeItem(activeIndex);
-    return;
-  }
-  const pending = gallery.findIndex(item => item.state === 'pending');
-  if (pending >= 0) {
-    analyzeItem(pending);
+confirmBtn.onclick = async () => {
+  // 一次性确定：批量自动分析所有待校验图片，无需逐张点确定
+  const pendings = gallery.map((item, i) => item.state === 'pending' ? i : -1).filter(i => i >= 0);
+  if (pendings.length > 0) {
+    // 逐张串行完成全部分析（小窗实时跟随每张图）
+    for (let k = 0; k < pendings.length; k++) {
+      await analyzeItem(pendings[k]);
+    }
+    // 批量全部完成后，自动跳到交互结果页展示（优先第一张 done，否则第一张）
+    const firstDone = gallery.findIndex(item => item.state === 'done');
+    if (firstDone >= 0) openItem(firstDone, false);
+    else if (gallery.length) openItem(activeIndex >= 0 ? activeIndex : 0, false);
     return;
   }
   if (activeIndex >= 0 && gallery[activeIndex] && gallery[activeIndex].state === 'done') {
@@ -1292,11 +1295,11 @@ fallbackBtn.onclick = () => {
 uploadArea.onclick = openFilePickerFromHome;
 prevPhotoBtn.onclick = () => {
   const i = activeIndex - 1;
-  if (i >= 0) switchToImage(i);
+  if (i >= 0) openItem(i, false); // 小窗跟随切换，直接展示该图已有结果（含不可用图）
 };
 nextPhotoBtn.onclick = () => {
   const i = activeIndex + 1;
-  if (i < gallery.length) switchToImage(i);
+  if (i < gallery.length) openItem(i, false); // 小窗跟随切换，直接展示该图已有结果（含不可用图）
   else failAlert('已查看当前所有图片，可点击“重新选择图片”上传更多照片。');
 };
 </script>
@@ -1307,4 +1310,4 @@ nextPhotoBtn.onclick = () => {
 
 <!-- synced 2026-10-12T12:13:30.171Z -->
 
-<!-- synced 2026-10-12T13:11:44.559Z -->
+<!-- synced 2026-10-12T13:25:03.569Z -->
