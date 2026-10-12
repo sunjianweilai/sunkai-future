@@ -522,35 +522,6 @@ function hideAnalyzingOverlay(){
   }
 }
 
-// 切图统一入口（上一张/下一张）：预览立刻切到该图、清空旧校验状态、
-// 隐藏 4 个功能按钮、小窗回"待校验"空白态，必须重按【确定】才校验
-function switchToImage(index){
-  const item = gallery[index];
-  if (!item) return;
-  activeIndex = index;
-  item._estimate = null;
-  item.acceptanceScore = null;
-  item.pixel = null;
-  item.thumb = null;
-  item.state = 'pending';
-  setPreview(item.file);
-  homeView.classList.add('hidden');
-  stageView.classList.remove('hidden');
-  homeBtn.classList.remove('hidden');
-  tabBar.style.display = 'none';
-  resultActions.style.display = 'flex';
-  document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
-  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
-  document.getElementById('modelCard').style.display = 'none';
-  const ph = '<div class="pending-notice"><h3 style="color:#a97e45;margin-bottom:10px">待校验</h3><p style="font-size:14px;color:#6a5a4a;line-height:1.7">已切换到第 ' + (index + 1) + ' 张，旧校验已清空。点【确定】对这张图片执行可用性校验。</p></div>';
-  ['p1','p2','p3','p4','reportBody'].forEach(function(id){ var el = document.getElementById(id); if (el) el.innerHTML = ph; });
-  nextHint.textContent = '已切换到第 ' + (index + 1) + ' / ' + gallery.length + ' 张（待校验，点【确定】执行可用性检查）';
-  confirmBtn.classList.remove('hidden');
-  refreshGallery();
-  showCurrentImageOverlay(index);
-  analyzingHint.textContent = '待校验：点【确定】开始检查这张图片';
-}
-
 (function makeOverlayDraggable(){
   let dragging = false;
   let offsetX = 0;
@@ -1124,17 +1095,34 @@ function openItem(index, keepPanel){
   activeIndex = index;
   const item = gallery[index];
   if (!item) return;
-  // 接受 done / rejected / pending 三种状态，确保切图时小窗始终跟随刷新
+  // 接受 done / rejected / failed / pending 四种状态，切图时小窗 + 预览 + 四界面始终跟随当前选中图刷新
+  // 切图立刻清空该图旧校验结果，确保各图互不干扰；有结果(done)的图直接展示，无结果的图显示待校验占位
+  item._estimate = null;
+  item.acceptanceScore = null;
+  item.pixel = null;
+  item.thumb = null;
+  if (item.state === 'done' || item.state === 'rejected' || item.state === 'failed') {
+    // 保留已有状态展示结果（切图不重新校验）
+  } else {
+    item.state = 'pending';
+  }
   setPreview(item.file);
   homeView.classList.add('hidden');
   stageView.classList.remove('hidden');
   homeBtn.classList.remove('hidden');
   resultActions.style.display = 'flex';
   tabBar.style.display = item.state === 'done' ? '' : 'none';
-  const suffix = item.state === 'rejected' ? '（该图片不可用）' : item.state === 'pending' ? '（待校验，点【确定】执行）' : '的分析结果';
+  const suffix = (item.state === 'rejected' || item.state === 'failed') ? '（该图片不可用）' : item.state === 'pending' ? '（待校验，点【确定】执行）' : '的分析结果';
   nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片' + suffix;
   if (item.state === 'done') {
     item._estimate = makeEstimateFor(item, index);
+  }
+  if (item.state === 'pending') {
+    // 切到待校验图：立刻清空旧校验标记，四界面显示占位，必须重按【确定】才执行校验
+    const pendingBlock = '<div class="pending-notice"><h3 style="color:#a97e45;margin-bottom:10px">待校验</h3>' +
+      '<p style="font-size:14px;color:#6a5a4a;line-height:1.7">已切换到第 ' + (index + 1) + ' 张，旧校验已清空。点【确定】对这张图片执行可用性校验。</p></div>';
+    ['p1','p2','p3','p4','reportBody'].forEach(function(id){ var el = document.getElementById(id); if (el) el.innerHTML = pendingBlock; });
+    confirmBtn.classList.remove('hidden');
   }
   refreshStagePanels(item, index);
   const panelToActivate = item.state === 'rejected' ? 'p1' : (keepPanel ? currentPanelId() : 'p1');
@@ -1160,7 +1148,7 @@ confirmBtn.onclick = async () => {
       let tries = 0;
       const timer = setInterval(function(){
         tries++;
-        const stillPending = gallery.some(it => it.state === 'pending');
+        const stillPending = pendings.length && pendings.some(function(i){ return gallery[i] && gallery[i].state === 'pending'; });
         if (!stillPending || tries > 200) { // 最多约 100 秒兜底
           clearInterval(timer);
           waitAll();
