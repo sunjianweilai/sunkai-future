@@ -852,6 +852,15 @@ function buildReportHTML(item, index){
 function refreshStagePanels(item, index){
   // 被拒图片：四个功能页面全部显示"图片不存在榫卯结构，请重新上传"
   if (item.state === 'rejected') { showRejectedOnPanels(item); return; }
+  // 待校验图片：显示占位，提示点【确定】才执行校验，不渲染假结果
+  if (item.state === 'pending') {
+    const pendingBlock = '<div class="pending-notice"><h3 style="color:#a97e45;margin-bottom:10px">待校验</h3>' +
+      '<p style="font-size:14px;color:#6a5a4a;line-height:1.7">这张图片（"' + (item ? item.file.name : '') + '"）还未执行可用性校验。请点【确定】开始检查：校验通过才会展示四个功能页面的结果。</p></div>';
+    ['p1','p2','p3','p4'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = pendingBlock; });
+    const report = document.getElementById('reportBody'); if (report) report.innerHTML = pendingBlock;
+    const mc = document.getElementById('modelCard'); if (mc) mc.style.display = 'none';
+    return;
+  }
   const data = item._estimate || (item._estimate = makeEstimateFor(item, index));
   const p = data.params;
   const r = data.results;
@@ -1086,18 +1095,19 @@ function showRejectedOnPanels(item){
 function openItem(index, keepPanel){
   activeIndex = index;
   const item = gallery[index];
-  if (!item || (item.state !== 'done' && item.state !== 'rejected')) return;
+  if (!item) return;
+  // 接受 done / rejected / pending 三种状态，确保切图时小窗始终跟随刷新
   setPreview(item.file);
   homeView.classList.add('hidden');
   stageView.classList.remove('hidden');
   homeBtn.classList.remove('hidden');
   resultActions.style.display = item.state === 'done' ? 'flex' : 'none';
-  nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片' + (item.state === 'rejected' ? '（未通过，无榫卯结构）' : '的分析结果');
+  const suffix = item.state === 'rejected' ? '（未通过，无榫卯结构）' : item.state === 'pending' ? '（待校验，点击【确定】执行）' : '的分析结果';
+  nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片' + suffix;
   if (item.state === 'done') {
     item._estimate = makeEstimateFor(item, index);
   }
   refreshStagePanels(item, index);
-  // keepPanel=true：保留当前标签；否则首次进入（通过图）默认展示 ① 图片基础信息；被拒图固定在 ①
   const panelToActivate = item.state === 'rejected' ? 'p1' : (keepPanel ? currentPanelId() : 'p1');
   activatePanel(panelToActivate, true);
   document.getElementById('modelCard').style.display = (item.state === 'done' && panelToActivate === 'p2') ? 'block' : 'none';
@@ -1236,8 +1246,7 @@ fallbackBtn.onclick = () => {
 };
 uploadArea.onclick = openFilePickerFromHome;
 prevPhotoBtn.onclick = () => {
-  let i = activeIndex - 1;
-  while (i >= 0 && gallery[i].state !== 'done') i--;
+  const i = activeIndex - 1;
   if (i >= 0) openItem(i, true);
 };
 nextPhotoBtn.onclick = () => {
@@ -1246,10 +1255,9 @@ nextPhotoBtn.onclick = () => {
     analyzeItem(pending);
     return;
   }
-  let i = activeIndex + 1;
-  while (i < gallery.length && gallery[i].state !== 'done') i++;
-  if (i < gallery.length && gallery[i].state === 'done') openItem(i, true);
-  else failAlert('已查看当前所有已完成图片，可点击“重新选择图片”上传更多照片。');
+  const i = activeIndex + 1;
+  if (i < gallery.length) openItem(i, true);
+  else failAlert('已查看当前所有图片，可点击“重新选择图片”上传更多照片。');
 };
 </script>
 </body>
@@ -1257,4 +1265,4 @@ nextPhotoBtn.onclick = () => {
 
 <!-- synced 2026-10-11T14:50:00.478Z -->
 
-<!-- synced 2026-10-12T12:06:03.451Z -->
+<!-- synced 2026-10-12T12:13:30.171Z -->
