@@ -503,8 +503,10 @@ function showCurrentImageOverlay(index){
   analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '图片不存在榫卯结构，请重新上传' : '待校验：点【确定】执行检查';
   // 小窗严格跟随“当前选中这张图”：不管这张图有没有结构，都显示它自己的图，绝不残留上一张的图
   // 用“当前这张图自己的 fullSrc”作为小窗图源（缺失就现建），被拒/失败/待校验图没有缩略图 thumb，也照样显示其原图 fullSrc
+  // 每次切图都重新指定 src（哪怕值不变），强制浏览器刷新，杜绝“小窗图片不动”的缓存残留
   if (!item.fullSrc) { item.fullSrc = URL.createObjectURL(item.file); }
   analyzingThumb.src = item.fullSrc;
+  analyzingThumb.setAttribute('src', item.fullSrc); // 强制重新赋值，确保切到被拒图时小窗立刻换成该图
   applyOverlaySize();
 }
 
@@ -1095,27 +1097,30 @@ function openItem(index, keepPanel){
   const item = gallery[index];
   if (!item) return;
   // 接受 done / rejected / failed / pending 四种状态，切图时小窗 + 预览 + 四界面始终跟随当前选中图刷新
-  // 切图立刻清空该图旧校验结果，确保各图互不干扰；有结果(done)的图直接展示，无结果的图显示待校验占位
-  item._estimate = null;
-  item.acceptanceScore = null;
-  item.pixel = null;
-  item.thumb = null;
-  if (item.state === 'done' || item.state === 'rejected' || item.state === 'failed') {
-    // 保留已有状态展示结果（切图不重新校验）
+  // 已分析完成(done)的图保留自身结果（不清空），直接展示；无结果的图显示待校验占位，必须重按【确定】才校验
+  if (item.state === 'done') {
+    // 有结果：保留 thumb/pixel/_estimate，切图不重新校验，小窗直接显示该图原图
   } else {
-    item.state = 'pending';
+    // 无结果（rejected/failed/pending）：清空旧校验标记，避免各图串数据
+    item._estimate = null;
+    item.acceptanceScore = null;
+    item.pixel = null;
+    item.thumb = null;
   }
   setPreview(item.file);
   homeView.classList.add('hidden');
   stageView.classList.remove('hidden');
   homeBtn.classList.remove('hidden');
   resultActions.style.display = 'flex';
-  tabBar.style.display = item.state === 'done' ? '' : 'none';
+  // 被拒图（无榫卯结构）保留 4 个功能按钮，方便逐个查看“四个分析界面都显示该提示”；其它非 done 状态才隐藏
+  tabBar.style.display = (item.state === 'done' || item.state === 'rejected') ? '' : 'none';
   const suffix = (item.state === 'rejected' || item.state === 'failed') ? '（该图片不可用）' : item.state === 'pending' ? '（待校验，点【确定】执行）' : '的分析结果';
   nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片' + suffix;
   if (item.state === 'done') {
     item._estimate = makeEstimateFor(item, index);
   }
+  // 被拒图：四个分析界面 + 报告页全部显示固定指令（任何情况下不许变）
+  if (item.state === 'rejected') { showRejectedOnPanels(item); }
   if (item.state === 'pending') {
     // 切到待校验图：立刻清空旧校验标记，四界面显示占位，必须重按【确定】才执行校验
     const pendingBlock = '<div class="pending-notice"><h3 style="color:#a97e45;margin-bottom:10px">待校验</h3>' +
