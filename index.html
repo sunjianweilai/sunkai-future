@@ -499,6 +499,10 @@ function showCurrentImageOverlay(index){
   analyzingTitle.textContent = '当前图片 · 第 ' + (index + 1) + ' 张';
   analyzingName.textContent = item.file.name;
   analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '图片不存在榫卯结构，请重新上传' : '待校验：点【确定】执行检查';
+  // 不存在榫卯结构(rejected)时：小窗也必须显示这张被拒图片本身，缩略图缺则用 fullSrc（缺则现建 blob）
+  if (item.state === 'rejected' && !item.thumb && !item.fullSrc) {
+    item.fullSrc = URL.createObjectURL(item.file);
+  }
   analyzingThumb.src = item.thumb || item.fullSrc || (currentUrl || previewImg.src || '');
   applyOverlaySize();
 }
@@ -1105,9 +1109,10 @@ function currentPanelId(){
 }
 
 function showRejectedOnPanels(item){
+  // 固定指令（任何时候不许变）：不存在榫卯结构时，四个功能页面 + 报告统一显示这句话
   const msg = '图片不存在榫卯结构，请重新上传';
   const block = '<div class="rejected-notice"><h3 style="color:#a33;margin-bottom:10px">' + msg + '</h3>' +
-    '<p style="font-size:14px;color:#6a5a4a;line-height:1.7">"' + (item ? item.file.name : '') + '" 未通过古建筑木构架特征检测，已停止该图的后续分析。请更换为古建椽条/瓦垄/榫卯节点等图片重新上传。</p></div>';
+    '<p style="font-size:14px;color:#6a5a4a;line-height:1.7">"' + (item ? item.file.name : '') + '" 经识别未包含古建筑榫卯节点/椽条/瓦垄等结构，已停止该图的后续分析。请更换为古建椽条/瓦垄/榫卯节点等图片重新上传。</p></div>';
   ['p1','p2','p3','p4'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = block; });
   const report = document.getElementById('reportBody'); if (report) report.innerHTML = block;
   const mc = document.getElementById('modelCard'); if (mc) mc.style.display = 'none';
@@ -1331,4 +1336,4 @@ nextPhotoBtn.onclick = () => {
 
 <!-- synced 2026-10-12T12:13:30.171Z -->
 
-<!-- synced 2026-10-12T13:38:58.517Z -->
+<!-- synced 2026-10-12T13:47:20.997Z -->
