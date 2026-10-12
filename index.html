@@ -973,9 +973,8 @@ function refreshGallery(){
     pill.appendChild(state);
 
     pill.onclick = () => {
-      openItem(index, true);
-      if (item.state === 'rejected') failAlert('该图片不可用（未通过）："' + item.file.name + '"，请重新选择图片。');
-      else if (item.state === 'pending') failAlert('该图片待校验："' + item.file.name + '"，请点【确定】开始检查。');
+      if (item.state === 'done') openItem(index, true);
+      else if (item.state === 'rejected') { openItem(index, true); failAlert('该图片不存在榫卯结构，无法生成分析结果："' + item.file.name + '"。请重新选择图片。'); }
     };
     // 删除键：从队列中移除这张图
     const del = document.createElement('button');
@@ -1051,14 +1050,9 @@ async function analyzeItem(index){
         refreshGallery();
         failAlert('图片不存在榫卯结构，请重新上传："' + item.file.name + '" 不符合古建筑木构架特征，已停止该图的后续分析。');
         setTimeout(() => {
-          // 竞态保护：1.8s 内若该图已被删/切走，则不再自动分析
-          if (index < gallery.length && gallery[index] && gallery[index].state === 'rejected') {
-            const nextPending = gallery.findIndex(it => it.state === 'pending');
-            if (nextPending >= 0) analyzeItem(nextPending);
-            else showCurrentImageOverlay(index);
-          } else {
-            showCurrentImageOverlay(activeIndex >= 0 ? activeIndex : 0);
-          }
+          const nextPending = gallery.findIndex(it => it.state === 'pending');
+          if (nextPending >= 0) analyzeItem(nextPending);
+          else showCurrentImageOverlay(index); // 保留小窗：显示当前被拒图
         }, 1800);
         return;
       }
@@ -1107,11 +1101,8 @@ function openItem(index, keepPanel){
   homeView.classList.add('hidden');
   stageView.classList.remove('hidden');
   homeBtn.classList.remove('hidden');
-  // 导航条（上一张/下一张/重新选择/返回主页）始终保留，避免切到被拒图后页面卡死；
-  // 仅 4 个功能 tab 按校验状态显示/隐藏
-  resultActions.style.display = 'flex';
-  tabBar.style.display = item.state === 'done' ? '' : 'none';
-  const suffix = item.state === 'rejected' ? '（该图片不可用，未通过）' : item.state === 'pending' ? '（待校验，点【确定】执行）' : '的分析结果';
+  resultActions.style.display = item.state === 'done' ? 'flex' : 'none';
+  const suffix = item.state === 'rejected' ? '（未通过，无榫卯结构）' : item.state === 'pending' ? '（待校验，点击【确定】执行）' : '的分析结果';
   nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片' + suffix;
   if (item.state === 'done') {
     item._estimate = makeEstimateFor(item, index);
@@ -1130,11 +1121,6 @@ fileInput.onchange = () => {
 };
 
 confirmBtn.onclick = () => {
-  // 优先校验当前小窗正在展示的这张（若它是待校验 pending），否则找队列里第一个 pending
-  if (activeIndex >= 0 && gallery[activeIndex] && gallery[activeIndex].state === 'pending') {
-    analyzeItem(activeIndex);
-    return;
-  }
   const pending = gallery.findIndex(item => item.state === 'pending');
   if (pending >= 0) {
     analyzeItem(pending);
@@ -1264,7 +1250,11 @@ prevPhotoBtn.onclick = () => {
   if (i >= 0) openItem(i, true);
 };
 nextPhotoBtn.onclick = () => {
-  // 纯切图：翻到下一张预览（不自动触发校验）
+  const pending = gallery.findIndex(item => item.state === 'pending');
+  if (pending >= 0) {
+    analyzeItem(pending);
+    return;
+  }
   const i = activeIndex + 1;
   if (i < gallery.length) openItem(i, true);
   else failAlert('已查看当前所有图片，可点击“重新选择图片”上传更多照片。');
@@ -1275,4 +1265,6 @@ nextPhotoBtn.onclick = () => {
 
 <!-- synced 2026-10-11T14:50:00.478Z -->
 
-<!-- synced 2026-10-12T12:34:19.796Z -->
+<!-- synced 2026-10-12T12:13:30.171Z -->
+
+<!-- synced 2026-10-12T12:39:28.748Z -->
