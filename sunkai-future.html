@@ -1059,44 +1059,52 @@ function makeThumb(file){
   });
 }
 
-async function analyzeItem(index){
+function analyzeItem(index){
   activeIndex = index;
   const item = gallery[index];
   setPreview(item.file);
   showAnalyzingOverlay(index, '正在检查图片可解码性…');
   refreshGallery();
 
-  const probe = new Image();
-  probe.onload = async () => {
-    if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
-      showAnalyzingOverlay(index, '正在识别图片像素特征…');
-      await analyzeImagePixels(item, index);
-      item.thumb = await makeThumb(item.file);
-      if ((item.acceptanceScore || 0) < ACCEPTANCE_THRESHOLD) {
-        item.state = 'rejected';
-        renderResultFor(item, index); // 小窗提示不可用 + 隐藏 4 个功能按钮
+  // 返回一个“分析真正完成后才 resolve”的 Promise，供批量串行 await
+  return new Promise(function(resolve){
+    const finish = () => { resolve(); };
+    const probe = new Image();
+    probe.onload = async () => {
+      if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+        showAnalyzingOverlay(index, '正在识别图片像素特征…');
+        await analyzeImagePixels(item, index);
+        item.thumb = await makeThumb(item.file);
+        if ((item.acceptanceScore || 0) < ACCEPTANCE_THRESHOLD) {
+          item.state = 'rejected';
+          renderResultFor(item, index); // 小窗提示不可用 + 隐藏 4 个功能按钮
+          refreshGallery();
+          failAlert('该图片不可用："' + item.file.name + '" 未通过古建筑木构架特征检测。请点【上一张/下一张】切换或【重新选择图片】上传新照片。');
+          finish();
+          return;
+        }
+        showAnalyzingOverlay(index, '正在生成结果…');
+        item.state = 'done';
+        renderResultFor(item, index); // 显示 4 个功能按钮 + 真实结果
         refreshGallery();
-        failAlert('该图片不可用："' + item.file.name + '" 未通过古建筑木构架特征检测。请点【上一张/下一张】切换或【重新选择图片】上传新照片。');
-        return;
+        finish();
+      } else {
+        item.state = 'failed';
+        renderResultFor(item, index);
+        refreshGallery();
+        failAlert('该图片不可用："' + item.file.name + '" 已解码但宽高为 0，可能已损坏。');
+        finish();
       }
-      showAnalyzingOverlay(index, '正在生成结果…');
-      item.state = 'done';
-      renderResultFor(item, index); // 显示 4 个功能按钮 + 真实结果
-      refreshGallery();
-    } else {
+    };
+    probe.onerror = () => {
       item.state = 'failed';
       renderResultFor(item, index);
       refreshGallery();
-      failAlert('该图片不可用："' + item.file.name + '" 已解码但宽高为 0，可能已损坏。');
-    }
-  };
-  probe.onerror = () => {
-    item.state = 'failed';
-    renderResultFor(item, index);
-    refreshGallery();
-    failAlert('该图片不可用："' + item.file.name + '" 无法解码，可能已损坏或格式不受支持。');
-  };
-  probe.src = currentUrl;
+      failAlert('该图片不可用："' + item.file.name + '" 无法解码，可能已损坏或格式不受支持。');
+      finish();
+    };
+    probe.src = currentUrl;
+  });
 }
 
 function currentPanelId(){
