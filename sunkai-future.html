@@ -1130,6 +1130,11 @@ fileInput.onchange = () => {
 };
 
 confirmBtn.onclick = () => {
+  // 优先校验当前小窗正在展示的这张（若它是待校验 pending），否则找队列里第一个 pending
+  if (activeIndex >= 0 && gallery[activeIndex] && gallery[activeIndex].state === 'pending') {
+    analyzeItem(activeIndex);
+    return;
+  }
   const pending = gallery.findIndex(item => item.state === 'pending');
   if (pending >= 0) {
     analyzeItem(pending);
