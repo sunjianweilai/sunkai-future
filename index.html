@@ -1059,52 +1059,44 @@ function makeThumb(file){
   });
 }
 
-function analyzeItem(index){
+async function analyzeItem(index){
   activeIndex = index;
   const item = gallery[index];
   setPreview(item.file);
   showAnalyzingOverlay(index, '正在检查图片可解码性…');
   refreshGallery();
 
-  // 返回一个“分析真正完成后才 resolve”的 Promise，供批量串行 await
-  return new Promise(function(resolve){
-    const finish = () => { resolve(); };
-    const probe = new Image();
-    probe.onload = async () => {
-      if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
-        showAnalyzingOverlay(index, '正在识别图片像素特征…');
-        await analyzeImagePixels(item, index);
-        item.thumb = await makeThumb(item.file);
-        if ((item.acceptanceScore || 0) < ACCEPTANCE_THRESHOLD) {
-          item.state = 'rejected';
-          renderResultFor(item, index); // 小窗提示不可用 + 隐藏 4 个功能按钮
-          refreshGallery();
-          failAlert('该图片不可用："' + item.file.name + '" 未通过古建筑木构架特征检测。请点【上一张/下一张】切换或【重新选择图片】上传新照片。');
-          finish();
-          return;
-        }
-        showAnalyzingOverlay(index, '正在生成结果…');
-        item.state = 'done';
-        renderResultFor(item, index); // 显示 4 个功能按钮 + 真实结果
+  const probe = new Image();
+  probe.onload = async () => {
+    if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
+      showAnalyzingOverlay(index, '正在识别图片像素特征…');
+      await analyzeImagePixels(item, index);
+      item.thumb = await makeThumb(item.file);
+      if ((item.acceptanceScore || 0) < ACCEPTANCE_THRESHOLD) {
+        item.state = 'rejected';
+        renderResultFor(item, index); // 小窗提示不可用 + 隐藏 4 个功能按钮
         refreshGallery();
-        finish();
-      } else {
-        item.state = 'failed';
-        renderResultFor(item, index);
-        refreshGallery();
-        failAlert('该图片不可用："' + item.file.name + '" 已解码但宽高为 0，可能已损坏。');
-        finish();
+        failAlert('该图片不可用："' + item.file.name + '" 未通过古建筑木构架特征检测。请点【上一张/下一张】切换或【重新选择图片】上传新照片。');
+        return;
       }
-    };
-    probe.onerror = () => {
+      showAnalyzingOverlay(index, '正在生成结果…');
+      item.state = 'done';
+      renderResultFor(item, index); // 显示 4 个功能按钮 + 真实结果
+      refreshGallery();
+    } else {
       item.state = 'failed';
       renderResultFor(item, index);
       refreshGallery();
-      failAlert('该图片不可用："' + item.file.name + '" 无法解码，可能已损坏或格式不受支持。');
-      finish();
-    };
-    probe.src = currentUrl;
-  });
+      failAlert('该图片不可用："' + item.file.name + '" 已解码但宽高为 0，可能已损坏。');
+    }
+  };
+  probe.onerror = () => {
+    item.state = 'failed';
+    renderResultFor(item, index);
+    refreshGallery();
+    failAlert('该图片不可用："' + item.file.name + '" 无法解码，可能已损坏或格式不受支持。');
+  };
+  probe.src = currentUrl;
 }
 
 function currentPanelId(){
@@ -1151,13 +1143,23 @@ fileInput.onchange = () => {
 };
 
 confirmBtn.onclick = async () => {
-  // 一次性确定：批量自动分析所有待校验图片，无需逐张点确定
+  // 一次性确定：批量分析所有待校验图片（每张的回调各自跑完分析），全部完成后自动跳结果页
   const pendings = gallery.map((item, i) => item.state === 'pending' ? i : -1).filter(i => i >= 0);
   if (pendings.length > 0) {
-    // 逐张串行完成全部分析（小窗实时跟随每张图）
-    for (let k = 0; k < pendings.length; k++) {
-      await analyzeItem(pendings[k]);
-    }
+    // 逐张发起分析（不阻塞，靠回调完成）
+    pendings.forEach(i => { analyzeItem(i); });
+    // 轮询等待所有图都离开 pending 态（done / rejected / failed）
+    await new Promise(function(waitAll){
+      let tries = 0;
+      const timer = setInterval(function(){
+        tries++;
+        const stillPending = gallery.some(it => it.state === 'pending');
+        if (!stillPending || tries > 200) { // 最多约 100 秒兜底
+          clearInterval(timer);
+          waitAll();
+        }
+      }, 500);
+    });
     // 批量全部完成后，自动跳到交互结果页展示（优先第一张 done，否则第一张）
     const firstDone = gallery.findIndex(item => item.state === 'done');
     if (firstDone >= 0) openItem(firstDone, false);
@@ -1231,7 +1233,18 @@ function renderResultFor(item, index){
     document.getElementById('modelCard').style.display = 'none';
     nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片的分析结果';
     showCurrentImageOverlay(index);
+  } else if (item.state === 'rejected') {
+    // 不存在榫卯结构：四个功能页面 + 报告统一显示固定指令“图片不存在榫卯结构，请重新上传”（任何时候不许变）
+    tabBar.style.display = 'none';
+    resultActions.style.display = 'flex';
+    document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+    document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+    document.getElementById('modelCard').style.display = 'none';
+    nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片（该图片不可用）';
+    showRejectedOnPanels(item); // 四个功能页面 + 报告页统一显示“图片不存在榫卯结构，请重新上传”
+    showCurrentImageOverlay(index);
   } else {
+    // failed：解码失败/损坏（非“不存在榫卯结构”），保留原有不可用提示
     tabBar.style.display = 'none';
     resultActions.style.display = 'flex';
     document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
@@ -1318,4 +1331,4 @@ nextPhotoBtn.onclick = () => {
 
 <!-- synced 2026-10-12T12:13:30.171Z -->
 
-<!-- synced 2026-10-12T13:27:48.583Z -->
+<!-- synced 2026-10-12T13:38:58.517Z -->
