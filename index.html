@@ -501,11 +501,10 @@ function showCurrentImageOverlay(index){
   analyzingTitle.textContent = '当前图片 · 第 ' + (index + 1) + ' 张';
   analyzingName.textContent = item.file.name;
   analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '图片不存在榫卯结构，请重新上传' : '待校验：点【确定】执行检查';
-  // 小窗严格跟随“当前选中这张图”：
-  // 存在结构(done) → 显示该图缩略图；不存在结构(rejected) → 也显示该被拒图本身（绝不残留上一张）
-  // 统一用“当前这张图自己的 fullSrc”作为小窗图源，缺失就现建，杜绝跟错图
+  // 小窗严格跟随“当前选中这张图”：不管这张图有没有结构，都显示它自己的图，绝不残留上一张的图
+  // 用“当前这张图自己的 fullSrc”作为小窗图源（缺失就现建），被拒/失败/待校验图没有缩略图 thumb，也照样显示其原图 fullSrc
   if (!item.fullSrc) { item.fullSrc = URL.createObjectURL(item.file); }
-  analyzingThumb.src = (item.state === 'done' && item.thumb) ? item.thumb : item.fullSrc;
+  analyzingThumb.src = item.fullSrc;
   applyOverlaySize();
 }
 
@@ -1311,11 +1310,11 @@ fallbackBtn.onclick = () => {
 uploadArea.onclick = openFilePickerFromHome;
 prevPhotoBtn.onclick = () => {
   const i = activeIndex - 1;
-  if (i >= 0) openItem(i, false); // 小窗跟随切换，直接展示该图已有结果（含不可用图）
+  if (i >= 0) { openItem(i, false); showCurrentImageOverlay(i); } // 切图后强制小窗显示当前这张图（含无结构图），小窗不再残留上一张
 };
 nextPhotoBtn.onclick = () => {
   const i = activeIndex + 1;
-  if (i < gallery.length) openItem(i, false); // 小窗跟随切换，直接展示该图已有结果（含不可用图）
+  if (i < gallery.length) { openItem(i, false); showCurrentImageOverlay(i); } // 切图后强制小窗显示当前这张图（含无结构图），小窗不再残留上一张
   else failAlert('已查看当前所有图片，可点击“重新选择图片”上传更多照片。');
 };
 </script>
@@ -1326,4 +1325,4 @@ nextPhotoBtn.onclick = () => {
 
 <!-- synced 2026-10-12T12:13:30.171Z -->
 
-<!-- synced 2026-10-12T14:07:56.738Z -->
+<!-- synced 2026-10-12T14:23:30.852Z -->
