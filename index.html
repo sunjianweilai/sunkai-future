@@ -501,10 +501,10 @@ function showCurrentImageOverlay(index){
   analyzingTitle.textContent = '当前图片 · 第 ' + (index + 1) + ' 张';
   analyzingName.textContent = item.file.name;
   analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '图片不存在榫卯结构，请重新上传' : '待校验：点【确定】执行检查';
-  // 小窗严格跟随“当前选中这张图”：不管这张图有没有结构，都显示它自己的原图，绝不残留上一张的图
-  // 被拒/失败/待校验图没有生成过缩略图 thumb，也直接用该图自己的原图 blob（缺失就现建）作为小窗图源
-  if (!item.thumb) { item.thumb = URL.createObjectURL(item.file); }
-  analyzingThumb.src = item.thumb;
+  // 小窗严格跟随“当前选中这张图”：不管这张图有没有结构，都显示它自己的原图（fullSrc），绝不残留上一张的图
+  // 被拒/失败/待校验图没有生成过缩略图 thumb，也照样用该图自己的原图 fullSrc 作为小窗图源，缺失就现建
+  if (!item.fullSrc) { item.fullSrc = URL.createObjectURL(item.file); }
+  analyzingThumb.src = item.fullSrc;
   applyOverlaySize();
 }
 
@@ -1109,7 +1109,7 @@ function openItem(index, keepPanel){
   stageView.classList.remove('hidden');
   homeBtn.classList.remove('hidden');
   resultActions.style.display = 'flex';
-  // 被拒图（无榫卯结构）保留 4 个功能按钮，方便逐个查看“四个分析界面都显示该提示”；其它非 done 状态才隐藏
+  // 被拒图（无榫卯结构）保留 4 个功能按钮，方便逐个查看“四个分析界面都显示该提示”；只有 pending/failed 才隐藏
   tabBar.style.display = (item.state === 'done' || item.state === 'rejected') ? '' : 'none';
   const suffix = (item.state === 'rejected' || item.state === 'failed') ? '（该图片不可用）' : item.state === 'pending' ? '（待校验，点【确定】执行）' : '的分析结果';
   nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片' + suffix;
@@ -1231,13 +1231,13 @@ function renderResultFor(item, index){
     showCurrentImageOverlay(index);
   } else if (item.state === 'rejected') {
     // 不存在榫卯结构：四个功能页面 + 报告统一显示固定指令“图片不存在榫卯结构，请重新上传”（任何时候不许变）
-    tabBar.style.display = 'none';
+    // 保留 4 个功能按钮（tabBar 不隐藏），让 ①②③④ 四个分析界面都能点进去、都显示这句话
+    tabBar.style.display = '';
     resultActions.style.display = 'flex';
-    document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
-    document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
     document.getElementById('modelCard').style.display = 'none';
     nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片（该图片不可用）';
     showRejectedOnPanels(item); // 四个功能页面 + 报告页统一显示“图片不存在榫卯结构，请重新上传”
+    activatePanel('p1', true);
     showCurrentImageOverlay(index);
   } else {
     // failed：解码失败/损坏（非“不存在榫卯结构”），保留原有不可用提示
@@ -1327,4 +1327,4 @@ nextPhotoBtn.onclick = () => {
 
 <!-- synced 2026-10-12T12:13:30.171Z -->
 
-<!-- synced 2026-10-12T14:40:55.380Z -->
+<!-- synced 2026-10-12T14:49:29.675Z -->
