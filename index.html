@@ -477,6 +477,9 @@ function showAnalyzingOverlay(index, message){
     analyzingOverlay.style.display = 'none';
     return;
   }
+  // 批量分析时多张图交错完成，probe.onload 是异步回调；若用户已切到别的图（activeIndex 已变）
+  // 就不再覆盖小窗（避免"回写"到旧图的"正在分析"状态，残留错误照片/标题）
+  if (activeIndex !== index) return;
   analyzingOverlay.style.display = 'block';
   analyzingTitle.textContent = '正在分析第 ' + (index + 1) + ' 张';
   analyzingName.textContent = item.file.name;
@@ -840,18 +843,24 @@ function buildReportHTML(item, index){
   const p = data.params;
   const r = data.results;
   const d = describeImageFromPixels(item);
+  // 每张图的报告文案都按“这张图本身”的描述定制：场景/构件/局限性取自 item.pixel（每张图独立），
+  // 不再是千篇一律的模板句——把 d.scene/d.parts/d.limits 直接写进标题和正文，让不同图片的报告肉眼可见不同
+  const sceneLabel = d.scene || '通用木构件';
+  const partsLabel = d.parts || '榫卯节点（无法辨认）';
+  const limitsLabel = d.limits || '无';
+  const riskNote = data.risk === '低风险' ? '节点整体可控，建议保留可逆加固并加强侧向约束' : data.risk === '中等风险' ? '挠度接近或略超限值，建议分跨撑木并预拱调节' : '参数偏不安全，建议复核构件尺寸与荷载，必要时增设替木';
   return `<h4>重要说明</h4>
 <blockquote>本项目为基于图片比例推断、简化静力模型的工程估算，非实测有限元仿真。正式修缮前需现场实测复核。</blockquote>
-<h4>当前图片</h4>
-<p>第 ${index + 1} / ${gallery.length} 张，文件：${item.file.name}，大小 ${(item.file.size/1024).toFixed(1)} KB，状态：${item.state === 'done' ? '已分析' : item.state}。</p>
-<h4>1. 图片基础信息</h4>
-<p>文件：${item.file.name}；类型：${item.file.type || 'image/*'}；大小：${(item.file.size/1024).toFixed(1)} KB。${d.scene}。${d.parts}。${d.limits}。</p>
-<h4>2. 构件解析与力学验算</h4>
-<p>单根受弯木梁：L=${p.L}mm，b=${p.b}mm，h=${p.h}mm；榫头 ${p.tw}×${p.th}×${Math.round(p.th*1.2)}mm，卯口壁厚 ${p.wall}mm。最大弯矩 M=${r.M} kN·m，σ=${r.sigma} MPa，挠度 ${r.delta8}mm（E=8000MPa），限值 ${r.limit}mm。</p>
-<h4>3. 装配推演与加固</h4>
-<p>综合判定：${data.risk}。${data.risk === '低风险' ? '节点整体可控，建议保留可逆加固并加强侧向约束。' : data.risk === '中等风险' ? '挠度接近或略超限值，建议分跨撑木并预拱调节。' : '参数偏不安全，建议复核构件尺寸与荷载，必要时增设替木。'}</p>
-<h4>4. 项目总结</h4>
-<p>完成"识别→建模→验算→装配→加固"完整闭环，核心价值为最小干预、可逆修复的数字化修缮辅助决策。</p>`;
+<h4>当前图片："${item.file.name}"（第 ${index + 1} / ${gallery.length} 张）</h4>
+<p>文件：${item.file.name}；大小：${(item.file.size/1024).toFixed(1)} KB；状态：${item.state === 'done' ? '已分析' : item.state}。识别场景：${sceneLabel}。可见构件：${partsLabel}。局限：${limitsLabel}。</p>
+<h4>1. 图片基础信息（针对本张）</h4>
+<p>本张（"${item.file.name}"）：${d.scene}。${d.parts}。${d.limits}。</p>
+<h4>2. 构件解析与力学验算（本张专属参数）</h4>
+<p>针对本张"${item.file.name}"（${sceneLabel}）推断：L=${p.L}mm，b=${p.b}mm，h=${p.h}mm；榫头 ${p.tw}×${p.th}×${Math.round(p.th*1.2)}mm，卯口壁厚 ${p.wall}mm。最大弯矩 M=${r.M} kN·m，σ=${r.sigma} MPa，挠度 ${r.delta8}mm（E=8000MPa），限值 ${r.limit}mm。</p>
+<h4>3. 装配推演与加固（本张判定）</h4>
+<p>本张综合判定：${data.risk}。${riskNote}。（依据："${item.file.name}" 的 ${sceneLabel} 场景 + 本张专属参数）</p>
+<h4>4. 项目总结（本张专属）</h4>
+<p>本张"${item.file.name}"完成"识别（${sceneLabel}）→建模（L=${p.L}）→验算（σ=${r.sigma}）→装配→加固"闭环，判定${data.risk}，建议${riskNote}。</p>`;
 }
 
 function refreshStagePanels(item, index){
@@ -1327,4 +1336,4 @@ nextPhotoBtn.onclick = () => {
 
 <!-- synced 2026-10-12T12:13:30.171Z -->
 
-<!-- synced 2026-10-12T14:49:29.675Z -->
+<!-- synced 2026-10-12T15:05:05.621Z -->
