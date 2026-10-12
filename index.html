@@ -498,7 +498,7 @@ function showCurrentImageOverlay(index){
   analyzingOverlay.style.display = 'block';
   analyzingTitle.textContent = '当前图片 · 第 ' + (index + 1) + ' 张';
   analyzingName.textContent = item.file.name;
-  analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '图片不存在榫卯结构，请重新上传' : '待分析';
+  analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '图片不存在榫卯结构，请重新上传' : '待校验：点【确定】执行检查';
   analyzingThumb.src = item.thumb || item.fullSrc || (currentUrl || previewImg.src || '');
   applyOverlaySize();
 }
@@ -514,6 +514,35 @@ function hideAnalyzingOverlay(){
     analyzingName.textContent = '（尚未上传图片）';
     analyzingHint.textContent = '请上传图片开始分析';
   }
+}
+
+// 切图统一入口（上一张/下一张）：预览立刻切到该图、清空旧校验状态、
+// 隐藏 4 个功能按钮、小窗回"待校验"空白态，必须重按【确定】才校验
+function switchToImage(index){
+  const item = gallery[index];
+  if (!item) return;
+  activeIndex = index;
+  item._estimate = null;
+  item.acceptanceScore = null;
+  item.pixel = null;
+  item.thumb = null;
+  item.state = 'pending';
+  setPreview(item.file);
+  homeView.classList.add('hidden');
+  stageView.classList.remove('hidden');
+  homeBtn.classList.remove('hidden');
+  tabBar.style.display = 'none';
+  resultActions.style.display = 'flex';
+  document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('modelCard').style.display = 'none';
+  const ph = '<div class="pending-notice"><h3 style="color:#a97e45;margin-bottom:10px">待校验</h3><p style="font-size:14px;color:#6a5a4a;line-height:1.7">已切换到第 ' + (index + 1) + ' 张，旧校验已清空。点【确定】对这张图片执行可用性校验。</p></div>';
+  ['p1','p2','p3','p4','reportBody'].forEach(function(id){ var el = document.getElementById(id); if (el) el.innerHTML = ph; });
+  nextHint.textContent = '已切换到第 ' + (index + 1) + ' / ' + gallery.length + ' 张（待校验，点【确定】执行可用性检查）';
+  confirmBtn.classList.remove('hidden');
+  refreshGallery();
+  showCurrentImageOverlay(index);
+  analyzingHint.textContent = '待校验：点【确定】开始检查这张图片';
 }
 
 (function makeOverlayDraggable(){
@@ -1045,35 +1074,27 @@ async function analyzeItem(index){
       item.thumb = await makeThumb(item.file);
       if ((item.acceptanceScore || 0) < ACCEPTANCE_THRESHOLD) {
         item.state = 'rejected';
-        showAnalyzingOverlay(index, '未检测到榫卯结构');
-        showRejectedOnPanels(item);
+        renderResultFor(item, index); // 小窗提示不可用 + 隐藏 4 个功能按钮
         refreshGallery();
-        failAlert('图片不存在榫卯结构，请重新上传："' + item.file.name + '" 不符合古建筑木构架特征，已停止该图的后续分析。');
-        setTimeout(() => {
-          const nextPending = gallery.findIndex(it => it.state === 'pending');
-          if (nextPending >= 0) analyzeItem(nextPending);
-          else showCurrentImageOverlay(index); // 保留小窗：显示当前被拒图
-        }, 1800);
+        failAlert('该图片不可用："' + item.file.name + '" 未通过古建筑木构架特征检测。请点【上一张/下一张】切换或【重新选择图片】上传新照片。');
         return;
       }
-      showAnalyzingOverlay(index, '正在生成缩略图与结果…');
+      showAnalyzingOverlay(index, '正在生成结果…');
       item.state = 'done';
-      showCurrentImageOverlay(index);
-      successFlow(index);
+      renderResultFor(item, index); // 显示 4 个功能按钮 + 真实结果
+      refreshGallery();
     } else {
       item.state = 'failed';
-      showAnalyzingOverlay(index, '分析失败：图片解码失败');
-      failAlert('该图片不可用："' + item.file.name + '" 已解码但宽高为 0，可能已损坏。');
+      renderResultFor(item, index);
       refreshGallery();
-      setTimeout(() => showCurrentImageOverlay(index), 1800);
+      failAlert('该图片不可用："' + item.file.name + '" 已解码但宽高为 0，可能已损坏。');
     }
   };
   probe.onerror = () => {
     item.state = 'failed';
-    showAnalyzingOverlay(index, '分析失败：无法解码图片');
-    failAlert('该图片不可用："' + item.file.name + '" 无法解码，可能已损坏或格式不受支持。');
+    renderResultFor(item, index);
     refreshGallery();
-    setTimeout(() => showCurrentImageOverlay(index), 1800);
+    failAlert('该图片不可用："' + item.file.name + '" 无法解码，可能已损坏或格式不受支持。');
   };
   probe.src = currentUrl;
 }
@@ -1101,8 +1122,9 @@ function openItem(index, keepPanel){
   homeView.classList.add('hidden');
   stageView.classList.remove('hidden');
   homeBtn.classList.remove('hidden');
-  resultActions.style.display = item.state === 'done' ? 'flex' : 'none';
-  const suffix = item.state === 'rejected' ? '（未通过，无榫卯结构）' : item.state === 'pending' ? '（待校验，点击【确定】执行）' : '的分析结果';
+  resultActions.style.display = 'flex';
+  tabBar.style.display = item.state === 'done' ? '' : 'none';
+  const suffix = item.state === 'rejected' ? '（该图片不可用）' : item.state === 'pending' ? '（待校验，点【确定】执行）' : '的分析结果';
   nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片' + suffix;
   if (item.state === 'done') {
     item._estimate = makeEstimateFor(item, index);
@@ -1121,6 +1143,11 @@ fileInput.onchange = () => {
 };
 
 confirmBtn.onclick = () => {
+  // 优先校验当前小窗正在展示的这张（若它是待校验），否则找队列第一个 pending
+  if (activeIndex >= 0 && gallery[activeIndex] && gallery[activeIndex].state === 'pending') {
+    analyzeItem(activeIndex);
+    return;
+  }
   const pending = gallery.findIndex(item => item.state === 'pending');
   if (pending >= 0) {
     analyzeItem(pending);
@@ -1158,12 +1185,6 @@ document.getElementById('alertClose').onclick = () => {
   uploadAlert.style.display = 'none';
 };
 
-function successFlow(index){
-  activeIndex = index === undefined ? activeIndex : index;
-  const first = activeIndex === -1 ? 0 : activeIndex;
-  openItem(first, false);
-}
-
 tabBar.querySelectorAll('.tab-btn').forEach(btn => {
   btn.onclick = () => activatePanel(btn.dataset.panel);
 });
@@ -1186,6 +1207,30 @@ function activatePanel(id, force){
     }
   });
   if (id === 'p2') document.getElementById('modelCard').style.display = 'block';
+}
+
+// 校验结果展示：done → 4 个功能按钮 + 渲染真实结果；rejected/failed → 隐藏 4 个功能按钮 + 小窗提示
+function renderResultFor(item, index){
+  if (item.state === 'done') {
+    item._estimate = makeEstimateFor(item, index);
+    tabBar.style.display = '';
+    resultActions.style.display = 'flex';
+    refreshStagePanels(item, index);
+    activatePanel('p1', true);
+    document.getElementById('modelCard').style.display = 'none';
+    nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片的分析结果';
+    showCurrentImageOverlay(index);
+  } else {
+    tabBar.style.display = 'none';
+    resultActions.style.display = 'flex';
+    document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
+    document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+    document.getElementById('modelCard').style.display = 'none';
+    nextHint.textContent = '当前展示第 ' + (index + 1) + ' / ' + gallery.length + ' 张图片（该图片不可用）';
+    const ph = '<div class="rejected-notice"><h3 style="color:#a33;margin-bottom:10px">该图片不可用</h3><p style="font-size:14px;color:#6a5a4a;line-height:1.7">"' + item.file.name + '" 未通过可用性校验。请点【上一张/下一张】切换其它图片，或【重新选择图片】上传新照片。</p></div>';
+    ['p1','p2','p3','p4','reportBody'].forEach(function(id){ var el = document.getElementById(id); if (el) el.innerHTML = ph; });
+    showCurrentImageOverlay(index);
+  }
 }
 
 document.getElementById('copyScad') && (document.getElementById('copyScad').onclick = null);
@@ -1247,16 +1292,11 @@ fallbackBtn.onclick = () => {
 uploadArea.onclick = openFilePickerFromHome;
 prevPhotoBtn.onclick = () => {
   const i = activeIndex - 1;
-  if (i >= 0) openItem(i, true);
+  if (i >= 0) switchToImage(i);
 };
 nextPhotoBtn.onclick = () => {
-  const pending = gallery.findIndex(item => item.state === 'pending');
-  if (pending >= 0) {
-    analyzeItem(pending);
-    return;
-  }
   const i = activeIndex + 1;
-  if (i < gallery.length) openItem(i, true);
+  if (i < gallery.length) switchToImage(i);
   else failAlert('已查看当前所有图片，可点击“重新选择图片”上传更多照片。');
 };
 </script>
@@ -1267,4 +1307,4 @@ nextPhotoBtn.onclick = () => {
 
 <!-- synced 2026-10-12T12:13:30.171Z -->
 
-<!-- synced 2026-10-12T12:39:28.748Z -->
+<!-- synced 2026-10-12T12:47:44.698Z -->
