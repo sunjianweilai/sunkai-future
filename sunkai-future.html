@@ -1053,33 +1053,29 @@ async function analyzeItem(index){
 
   const probe = new Image();
   probe.onload = async () => {
+    // 批量分析时多张图交错完成，本回调可能比其它图晚触发；若用户已切到别的图（activeIndex 已变）
+    // 这张"迟到的旧回调"不得再碰小窗/预览（会残留旧图的照片/标题），只更新自己的数据字段，不刷 UI
+    const stillCurrent = activeIndex === index;
     if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
-      showAnalyzingOverlay(index, '正在识别图片像素特征…');
+      if (stillCurrent) showAnalyzingOverlay(index, '正在识别图片像素特征…');
       await analyzeImagePixels(item, index);
       item.thumb = await makeThumb(item.file);
       if ((item.acceptanceScore || 0) < ACCEPTANCE_THRESHOLD) {
         item.state = 'rejected';
-        renderResultFor(item, index); // 小窗提示不可用 + 隐藏 4 个功能按钮
-        refreshGallery();
-        failAlert('该图片不可用："' + item.file.name + '" 未通过古建筑木构架特征检测。请点【上一张/下一张】切换或【重新选择图片】上传新照片。');
+        if (stillCurrent) { renderResultFor(item, index); refreshGallery(); failAlert('该图片不可用："' + item.file.name + '" 未通过古建筑木构架特征检测。请点【上一张/下一张】切换或【重新选择图片】上传新照片。'); }
         return;
       }
-      showAnalyzingOverlay(index, '正在生成结果…');
+      if (stillCurrent) showAnalyzingOverlay(index, '正在生成结果…');
       item.state = 'done';
-      renderResultFor(item, index); // 显示 4 个功能按钮 + 真实结果
-      refreshGallery();
+      if (stillCurrent) { renderResultFor(item, index); refreshGallery(); }
     } else {
       item.state = 'failed';
-      renderResultFor(item, index);
-      refreshGallery();
-      failAlert('该图片不可用："' + item.file.name + '" 已解码但宽高为 0，可能已损坏。');
+      if (stillCurrent) { renderResultFor(item, index); refreshGallery(); failAlert('该图片不可用："' + item.file.name + '" 已解码但宽高为 0，可能已损坏。'); }
     }
   };
   probe.onerror = () => {
     item.state = 'failed';
-    renderResultFor(item, index);
-    refreshGallery();
-    failAlert('该图片不可用："' + item.file.name + '" 无法解码，可能已损坏或格式不受支持。');
+    if (activeIndex === index) { renderResultFor(item, index); refreshGallery(); failAlert('该图片不可用："' + item.file.name + '" 无法解码，可能已损坏或格式不受支持。'); };
   };
   probe.src = currentUrl;
 }
