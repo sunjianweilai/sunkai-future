@@ -499,7 +499,11 @@ function showCurrentImageOverlay(index){
   analyzingTitle.textContent = '当前图片 · 第 ' + (index + 1) + ' 张';
   analyzingName.textContent = item.file.name;
   analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '图片不存在榫卯结构，请重新上传' : '待校验：点【确定】执行检查';
-  analyzingThumb.src = item.thumb || item.fullSrc || (currentUrl || previewImg.src || '');
+  // 小窗始终显示“当前这张图”：优先 thumb，其次 fullSrc；两者都缺时用 file 现建 blob
+  if (!item.thumb && !item.fullSrc) {
+    item.fullSrc = URL.createObjectURL(item.file);
+  }
+  analyzingThumb.src = item.thumb || item.fullSrc || currentUrl || previewImg.src || '';
   applyOverlaySize();
 }
 
@@ -522,15 +526,23 @@ function switchToImage(index){
   const item = gallery[index];
   if (!item) return;
   activeIndex = index;
+  // 立刻清空该图旧的校验结果 / 状态标记（避免旧结果和新图错乱）
   item._estimate = null;
   item.acceptanceScore = null;
   item.pixel = null;
   item.thumb = null;
+  item.naturalWidth = 0;
+  item.naturalHeight = 0;
   item.state = 'pending';
+  // 确保该图有可用的 fullSrc，供预览大图与小窗缩略图共用
+  if (!item.fullSrc) {
+    item.fullSrc = URL.createObjectURL(item.file);
+  }
   setPreview(item.file);
   homeView.classList.add('hidden');
   stageView.classList.remove('hidden');
   homeBtn.classList.remove('hidden');
+  // 隐藏 4 个功能按钮，只有校验成功才重新展示
   tabBar.style.display = 'none';
   resultActions.style.display = 'flex';
   document.querySelectorAll('.panel').forEach(function(p){ p.classList.remove('active'); });
@@ -541,8 +553,12 @@ function switchToImage(index){
   nextHint.textContent = '已切换到第 ' + (index + 1) + ' / ' + gallery.length + ' 张（待校验，点【确定】执行可用性检查）';
   confirmBtn.classList.remove('hidden');
   refreshGallery();
+  // 小窗强制切到对应这张图（用 fullSrc，不再受旧 thumb 影响）
   showCurrentImageOverlay(index);
+  analyzingThumb.src = item.fullSrc;
+  analyzingName.textContent = item.file.name;
   analyzingHint.textContent = '待校验：点【确定】开始检查这张图片';
+  applyOverlaySize();
 }
 
 (function makeOverlayDraggable(){
@@ -1307,4 +1323,4 @@ nextPhotoBtn.onclick = () => {
 
 <!-- synced 2026-10-12T12:13:30.171Z -->
 
-<!-- synced 2026-10-12T12:49:42.067Z -->
+<!-- synced 2026-10-12T13:05:35.474Z -->
