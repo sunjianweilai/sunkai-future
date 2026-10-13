@@ -1050,16 +1050,23 @@ function makeThumb(file){
 }
 
 async function analyzeItem(index){
-  activeIndex = index;
+  // 不再在函数入口改写 activeIndex："正在分析哪张"和"当前选中/在看的哪张"是两回事，
+  // activeIndex 只应由用户明确切图（openItem/prev/next）更新，避免批量并发时多张图互相污染 activeIndex、
+  // 导致 stillCurrent 守卫误判（把本该刷小窗的图当成"用户已切走"而跳过），小窗因此一直残留旧图
   const item = gallery[index];
-  setPreview(item.file);
-  showAnalyzingOverlay(index, '正在检查图片可解码性…');
+  const currentActive = activeIndex;
+  if (currentActive === index) {
+    setPreview(item.file);
+    showAnalyzingOverlay(index, '正在检查图片可解码性…');
+  } else {
+    // 非当前选中图：不碰预览小窗，只继续后台分析，完成后（若这张正好是当前在看的）才统一刷新 UI
+  }
   refreshGallery();
 
   const probe = new Image();
   probe.onload = async () => {
-    // 批量分析时多张图交错完成，本回调可能比其它图晚触发；若用户已切到别的图（activeIndex 已变）
-    // 这张"迟到的旧回调"不得再碰小窗/预览（会残留旧图的照片/标题），只更新自己的数据字段，不刷 UI
+    // 本回调可能比其它图晚触发（批量交错完成）；只在"这张确实就是当前在看的图"时才允许刷小窗/预览，
+    // 否则只更新自己的数据字段（state/pixel/thumb），绝不动小窗，避免残留上一张的照片/标题
     const stillCurrent = activeIndex === index;
     if (probe.naturalWidth > 0 && probe.naturalHeight > 0) {
       if (stillCurrent) showAnalyzingOverlay(index, '正在识别图片像素特征…');
@@ -1082,7 +1089,7 @@ async function analyzeItem(index){
     item.state = 'failed';
     if (activeIndex === index) { renderResultFor(item, index); refreshGallery(); failAlert('该图片不可用："' + item.file.name + '" 无法解码，可能已损坏或格式不受支持。'); };
   };
-  probe.src = currentUrl;
+  probe.src = URL.createObjectURL(item.file);
 }
 
 function currentPanelId(){
@@ -1334,4 +1341,4 @@ nextPhotoBtn.onclick = () => {
 </html>
 
 
-<!-- synced 2026-10-13T05:21:14.017Z -->
+<!-- synced 2026-10-13T05:32:15.118Z -->
