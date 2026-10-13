@@ -1102,7 +1102,11 @@ function showRejectedOnPanels(item){
   const msg = '图片不存在榫卯结构，请重新上传';
   const block = '<div class="rejected-notice"><h3 style="color:#a33;margin-bottom:10px">' + msg + '</h3>' +
     '<p style="font-size:14px;color:#6a5a4a;line-height:1.7">"' + (item ? item.file.name : '') + '" 经识别未包含古建筑榫卯节点/椽条/瓦垄等结构，已停止该图的后续分析。请更换为古建椽条/瓦垄/榫卯节点等图片重新上传。</p></div>';
-  ['p1','p2','p3','p4'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = block; });
+  // p1/p2/p3 直接整块替换（这三个面板没有嵌套的具名子节点，innerHTML 重写是安全的）
+  ['p1','p2','p3'].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = block; });
+  // p4 内部嵌套着 <div id="reportBody">，绝不能对 p4 整块 innerHTML（会把 reportBody 节点本身销毁，
+  // 导致后续切到"可识别"图时 buildReportHTML 写 reportBody 找不到了，④报告永远残留这张被拒图的提示）——
+  // 直接写 reportBody 的 innerHTML，reportBody 节点本身保持不动、始终在 DOM 里
   const report = document.getElementById('reportBody'); if (report) report.innerHTML = block;
   const mc = document.getElementById('modelCard'); if (mc) mc.style.display = 'none';
 }
