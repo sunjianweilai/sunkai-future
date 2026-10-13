@@ -485,6 +485,8 @@ function showAnalyzingOverlay(index, message){
   analyzingName.textContent = item.file.name;
   analyzingHint.textContent = message || '正在检查图片可解码性…';
   // 分析中：小窗显示当前正在分析这张图（缺 fullSrc 就现建，绝不残留其它图）
+  // 先清空旧图源（防止新图解码慢时小窗一直残留上一张照片，造成"主界面已切换、小窗还卡旧图"的错位），再赋新图源
+  analyzingThumb.removeAttribute('src');
   if (!item.fullSrc) { item.fullSrc = URL.createObjectURL(item.file); }
   analyzingThumb.src = item.fullSrc;
   applyOverlaySize();
@@ -498,6 +500,7 @@ function showCurrentImageOverlay(index){
     analyzingTitle.textContent = '当前图片';
     analyzingName.textContent = '（尚未上传图片）';
     analyzingHint.textContent = '请上传图片开始分析';
+    analyzingThumb.removeAttribute('src');
     return;
   }
   analyzingOverlay.style.display = 'block';
@@ -505,7 +508,8 @@ function showCurrentImageOverlay(index){
   analyzingName.textContent = item.file.name;
   analyzingHint.textContent = item.state === 'done' ? '已分析完成' : item.state === 'failed' ? '分析失败' : item.state === 'rejected' ? '图片不存在榫卯结构，请重新上传' : '待校验：点【确定】执行检查';
   // 小窗严格跟随“当前选中这张图”：不管这张图有没有结构，都显示它自己的原图（fullSrc），绝不残留上一张的图
-  // 被拒/失败/待校验图没有生成过缩略图 thumb，也照样用该图自己的原图 fullSrc 作为小窗图源，缺失就现建
+  // 先清掉旧图源（置空 src，防止浏览器在解码完新图前一直显示上一张照片，造成"主界面已切换、小窗还卡旧图"的错位），再赋新图源
+  analyzingThumb.removeAttribute('src');
   if (!item.fullSrc) { item.fullSrc = URL.createObjectURL(item.file); }
   analyzingThumb.src = item.fullSrc;
   applyOverlaySize();
@@ -521,6 +525,7 @@ function hideAnalyzingOverlay(){
     analyzingTitle.textContent = '当前图片';
     analyzingName.textContent = '（尚未上传图片）';
     analyzingHint.textContent = '请上传图片开始分析';
+    analyzingThumb.removeAttribute('src');
   }
 }
 
@@ -1328,8 +1333,5 @@ nextPhotoBtn.onclick = () => {
 </body>
 </html>
 
-<!-- synced 2026-10-11T14:50:00.478Z -->
 
-<!-- synced 2026-10-12T12:13:30.171Z -->
-
-<!-- synced 2026-10-12T15:19:42.469Z -->
+<!-- synced 2026-10-13T05:21:14.017Z -->
